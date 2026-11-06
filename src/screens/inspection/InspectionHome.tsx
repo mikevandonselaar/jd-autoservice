@@ -33,7 +33,7 @@ export function InspectionHome() {
               <Link
                 key={draft.id}
                 to={`/inspectie/${draft.id}`}
-                className="flex min-h-[60px] items-center gap-3 border-b border-divider px-3.5 py-2 last:border-b-0"
+                className="flex min-h-14 items-center gap-3 border-b border-divider px-3.5 py-2 last:border-b-0"
               >
                 <PlateBadge plate={draft.plate} />
                 <span className="min-w-0 flex-1">
@@ -46,6 +46,11 @@ export function InspectionHome() {
           </Card>
         </>
       )}
+
+      <LinkButton to="/inspecties" variant="secondary">
+        Afgeronde inspecties
+        <Icon name="next" />
+      </LinkButton>
     </>
   )
 }

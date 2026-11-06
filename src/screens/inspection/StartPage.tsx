@@ -99,14 +99,14 @@ export function StartPage() {
           <label htmlFor="km" className="text-base font-semibold">
             Kilometerstand
           </label>
-          <div className="flex h-[60px] items-center gap-1.5 rounded-sm border-[3px] border-charcoal bg-surface px-3">
+          <div className="flex h-14 items-center gap-1.5 rounded-sm border-[3px] border-charcoal bg-surface px-3">
             <input
               id="km"
               inputMode="numeric"
               autoComplete="off"
               value={kmText === '' ? '' : formatKm(Number(kmText))}
               onChange={(event) => setKmText(event.target.value.replace(/\D/g, '').slice(0, 7).replace(/^0+(?=\d)/, ''))}
-              className="w-full min-w-0 flex-1 bg-transparent text-[26px] font-bold text-ink focus:outline-none"
+              className="w-full min-w-0 flex-1 bg-transparent text-2xl font-bold text-ink focus:outline-none"
             />
             <span className="font-semibold text-muted">km</span>
           </div>

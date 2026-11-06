@@ -18,15 +18,15 @@ Vite, React 19, TypeScript 6 (pinned: typescript-eslint does not support 6.1+ ye
 ## Conventions
 
 - Code, comments, identifiers and logs are English. Interface copy is Dutch, plain and short, addressing the user as "je".
-- Tokens (colours, fonts, radius) are defined once, in the `@theme` block of `src/index.css`. Use the token classes, never raw hex values in components.
+- Tokens (colours, fonts, type sizes, radius) are defined once, in the `@theme` block of `src/index.css`. Use the token classes (`text-base`, `bg-charcoal`), never raw hex or pixel values in components.
 - Primary buttons are charcoal with white text. Red is a small brand accent and otherwise means fault.
-- Raleway 700 uppercase for headings, Open Sans for body text and all numbers. Corners 4px. Touch targets at least 56px high. Text at least 16px.
+- Raleway 700 uppercase for headings, Open Sans for body text and all numbers. Corners 4px. Touch targets at least 56px high. Text at least 15px (body 15, buttons and inputs 16, headings 22).
 - Fonts are self-hosted through `@fontsource` (latin subset), not loaded from Google.
 - Match the surrounding code: comment density, naming and idiom.
 
 ## Design source
 
-Only the phone row "Telefoon · inspectie (mobiele variant)", artboards M1 to M6, of the design artifact `2144c951-f169-4cbb-b609-6d1f3421045f` (claude.ai/code/artifact/2144c951-f169-4cbb-b609-6d1f3421045f). One single-column layout for every role and device: white 60px header with the compact logo and a diagonal red and charcoal panel, `#F4F4F4` main, white footer with the main action. Content is a centred column of at most 480px on larger screens. The other artboards are not used. Where the design uses 14px or 15px text, use 16px.
+Only the phone row "Telefoon · inspectie (mobiele variant)", artboards M1 to M6, of the design artifact `2144c951-f169-4cbb-b609-6d1f3421045f` (claude.ai/code/artifact/2144c951-f169-4cbb-b609-6d1f3421045f). One single-column layout for every role and device: white 60px header with the compact logo and a diagonal red and charcoal panel, `#F4F4F4` main, white footer with the main action. Content is a centred column of at most 480px on larger screens. The other artboards are not used. Where the design uses 14px text, use 15px. Other sizes follow the scale in `src/index.css`, which is a little smaller than the design.
 
 ## Data and roles
 
@@ -34,6 +34,7 @@ Only the phone row "Telefoon · inspectie (mobiele variant)", artboards M1 to M6
 - Inspections are done by `employee` and `admin` on their own account; the mechanic is the logged-in user. `workshop` has no access to checklists or inspections.
 - The owner manages several checklists (`checklists`, `checklist_blocks`, `checklist_points`, `checklist_measurements`). Starting an inspection copies the chosen checklist into `inspection_items` and `inspection_readings`, so later edits never change past inspections.
 - The role comes from the employees table only, never from the JWT or user metadata. `private.current_app_role()` reads it, and returns null after `end_date`.
+- Photos of a point are files in the private bucket `inspection-photos` (`{inspection_id}/{item_id}/{photo_id}.jpg`), listed in `inspection_photos`. Never a row without a file: upload, then `add_item_photo`; `delete_item_photo`, then delete the file. Delete files through the Storage API only, never with SQL. See `docs/plan-fotos.md`.
 - RLS only filters rows, not columns. Anything the workshop account needs about other employees (for example a name picker) must come from an RPC that returns only those fields, never from a select on `employees`.
 
 ## Security rules

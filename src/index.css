@@ -30,6 +30,13 @@
   --font-heading: 'Raleway', Arial, sans-serif;
   --font-sans: 'Open Sans', Arial, sans-serif;
 
+  /* Type scale: body text 15px, buttons and inputs 16px. Components use these steps, not pixel values. */
+  --text-base: 0.9375rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.375rem;
+  --text-5xl: 2.5rem;
+
   --radius-sm: 4px;
 }
 

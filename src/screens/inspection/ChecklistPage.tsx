@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { useEmployee } from '../../auth/AuthProvider'
 import { Accordion } from '../../components/Accordion'
 import { AppShell } from '../../components/AppShell'
@@ -7,24 +7,18 @@ import { BottomSheet } from '../../components/BottomSheet'
 import { Button, LinkButton } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Icon } from '../../components/icons'
-import { MeasureCard } from '../../components/MeasureCard'
 import { Notice } from '../../components/Notice'
 import { PlateBadge } from '../../components/PlateBadge'
 import { ProgressBar } from '../../components/ProgressBar'
-import { SectionLabel } from '../../components/SectionLabel'
-import { StatusTile } from '../../components/StatusTile'
 import { UndoToast } from '../../components/UndoToast'
 import { useInspection } from '../../inspection/InspectionContext'
-import { countByStatus, countReadings, priorAdvice, readingState } from '../../inspection/rules'
-import type { InspectionItem } from '../../inspection/types'
+import { countByStatus, countReadings, priorAdvice, readingState, suggestedStatus } from '../../inspection/rules'
+import type { InspectionItem, Reading } from '../../inspection/types'
 import { formatKm } from '../../lib/format'
-import { FaultSheet } from './FaultSheet'
+import { ChecklistRow } from './ChecklistRow'
 import { MeasureSheet } from './MeasureSheet'
 
-type Sheet =
-  | { kind: 'measure'; itemId: string; readingId: string }
-  | { kind: 'fault'; itemId: string; suggest: 'fault' | 'advice' | null }
-  | { kind: 'discard' }
+type Sheet = { kind: 'measure'; itemId: string; readingId: string } | { kind: 'discard' }
 
 type Block = { sort: number; name: string; items: InspectionItem[] }
 
@@ -39,17 +33,26 @@ function groupBlocks(items: InspectionItem[]): Block[] {
   return blocks
 }
 
-/** M2: the blocks of the checklist, with the measurements on top. */
+/** M2: the blocks of the checklist, one row per point. */
 export function ChecklistPage() {
   const employee = useEmployee()
   const navigate = useNavigate()
+  // The check can send you back to change one point: its panel is open and in view.
+  const expandId = (useLocation().state as { expand?: string } | null)?.expand ?? null
   const { inspection, items, previousByPoint, saveFailed, setResults, discard } = useInspection()
   const blocks = useMemo(() => groupBlocks(items), [items])
   const [onlyOpen, setOnlyOpen] = useState(false)
-  // Starts on the first block that still has open points.
-  const [expanded, setExpanded] = useState<number | null>(
-    () => (blocks.find((block) => block.items.some((item) => item.status === 'open')) ?? blocks[0])?.sort ?? null,
-  )
+  // Starts on the block of the point to change, or the first block that still has open points.
+  const [expanded, setExpanded] = useState<number | null>(() => {
+    const wanted = blocks.find((block) => block.items.some((item) => item.id === expandId))
+    return (
+      (wanted ?? blocks.find((block) => block.items.some((item) => item.status === 'open')) ?? blocks[0])?.sort ?? null
+    )
+  })
+  // The point with the reason panel open.
+  const [panelId, setPanelId] = useState<string | null>(expandId)
+  // Points whose result the readings set and the mechanic has not changed yet.
+  const [suggested, setSuggested] = useState<ReadonlySet<string>>(new Set())
   const [sheet, setSheet] = useState<Sheet | null>(null)
   // The points that "Rest goed" just set, so Herstel can put them back.
   const [undo, setUndo] = useState<string[] | null>(null)
@@ -61,22 +64,61 @@ export function ChecklistPage() {
     return () => clearTimeout(timer)
   }, [undo])
 
+  useEffect(() => {
+    if (expandId) document.getElementById(`item-${expandId}`)?.scrollIntoView({ block: 'center' })
+  }, [expandId])
+
   if (inspection.status === 'completed') return <Navigate to={`/inspectie/${inspection.id}/klaar`} replace />
 
   const open = countByStatus(items).open
   const readings = countReadings(items)
-  const cards = items.flatMap((item) => item.readings.map((reading) => ({ item, reading })))
-  const sheetItem = sheet && sheet.kind !== 'discard' ? items.find((item) => item.id === sheet.itemId) : undefined
+  const sheetItem = sheet?.kind === 'measure' ? items.find((item) => item.id === sheet.itemId) : undefined
 
-  function tap(item: InspectionItem) {
+  function markSuggested(id: string, on: boolean) {
+    setSuggested((current) => {
+      const next = new Set(current)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function good(item: InspectionItem) {
     setUndo(null)
-    if (item.status === 'open') void setResults([item.id], 'ok', null, null)
-    else if (item.status === 'ok') setSheet({ kind: 'fault', itemId: item.id, suggest: null })
-    else void setResults([item.id], 'open', null, null)
+    setPanelId(null)
+    markSuggested(item.id, false)
+    void setResults([item.id], 'ok', null, null)
+  }
+
+  function fault(item: InspectionItem) {
+    setUndo(null)
+    setPanelId(panelId === item.id ? null : item.id)
+  }
+
+  /** The measuring sheet is done: the readings suggest the result, the mechanic can still change it. */
+  function finishMeasuring(item: InspectionItem, values: Reading[]) {
+    setSheet(null)
+    const target = suggestedStatus(values.map((reading) => readingState(reading)))
+    // Only a point that is still open, or still carries an earlier suggestion, is set by the readings.
+    if (!target || !(item.status === 'open' || suggested.has(item.id))) return
+
+    if (target === 'ok') {
+      if (item.status !== 'ok') void setResults([item.id], 'ok', null, null)
+      setPanelId(null)
+    } else if (target === 'fault') {
+      if (item.status !== 'fault') void setResults([item.id], 'fault', null, null)
+      setPanelId(item.id)
+    } else {
+      // An advice needs a term, which the mechanic chooses: the point stays open until then.
+      if (item.status !== 'open') void setResults([item.id], 'open', null, null)
+      setPanelId(item.id)
+    }
+    markSuggested(item.id, true)
   }
 
   function restOk(block: Block) {
-    const ids = block.items.filter((item) => item.status === 'open').map((item) => item.id)
+    // A point with measurements is done by measuring it.
+    const ids = block.items.filter((item) => item.status === 'open' && item.readings.length === 0).map((item) => item.id)
     void setResults(ids, 'ok', null, null)
     setUndo(ids)
   }
@@ -129,7 +171,7 @@ export function ChecklistPage() {
       )}
 
       <div className="flex items-center gap-2.5">
-        <span className="flex-1 text-muted">Tik: open → goed → niet goed</span>
+        <span className="flex-1 text-muted">Goed of Fout per punt. Bij een meting eerst Meten.</span>
         <button
           type="button"
           aria-pressed={onlyOpen}
@@ -145,34 +187,14 @@ export function ChecklistPage() {
         </button>
       </div>
 
-      {cards.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <SectionLabel>Metingen</SectionLabel>
-            <span className="text-muted">Tik om te meten</span>
-          </div>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {cards.map(({ item, reading }) => (
-              <MeasureCard
-                key={reading.id}
-                label={item.readings.length > 1 ? `${item.label} ${reading.label}` : item.label}
-                value={reading.value}
-                unit={reading.unit}
-                state={readingState(reading)}
-                onTap={() => setSheet({ kind: 'measure', itemId: item.id, readingId: reading.id })}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {onlyOpen && open === 0 && <Notice>Alle punten zijn ingevuld.</Notice>}
 
       <Card className="overflow-hidden">
         {blocks.map((block, index) => {
           const blockOpen = block.items.filter((item) => item.status === 'open')
-          if (onlyOpen && blockOpen.length === 0) return null
+          if (onlyOpen && blockOpen.length === 0 && !block.items.some((item) => item.id === panelId)) return null
           const earlier = blockOpen.filter((item) => priorAdvice(previousByPoint, item)).length
+          const restCount = blockOpen.filter((item) => item.readings.length === 0).length
           return (
             <Accordion
               key={block.sort}
@@ -190,21 +212,32 @@ export function ChecklistPage() {
               open={expanded === block.sort}
               onToggle={() => setExpanded(expanded === block.sort ? null : block.sort)}
             >
-              <div className="grid grid-cols-2 gap-1.5">
-                {(onlyOpen ? blockOpen : block.items).map((item) => (
-                  <StatusTile
+              {block.items
+                .filter((item) => !onlyOpen || item.status === 'open' || item.id === panelId)
+                .map((item) => (
+                  <ChecklistRow
                     key={item.id}
                     item={item}
                     earlierAdvice={priorAdvice(previousByPoint, item) !== undefined}
-                    onTap={() => tap(item)}
+                    suggested={suggested.has(item.id)}
+                    expanded={panelId === item.id}
+                    onGood={() => good(item)}
+                    onFault={() => fault(item)}
+                    onMeasure={(readingId) => {
+                      setUndo(null)
+                      setSheet({ kind: 'measure', itemId: item.id, readingId })
+                    }}
+                    onDecided={() => markSuggested(item.id, false)}
+                    onClosePanel={() => setPanelId(null)}
                   />
                 ))}
-              </div>
-              {blockOpen.length > 0 && (
-                <Button variant="secondary" onClick={() => restOk(block)}>
-                  <Icon name="check" />
-                  Rest goed ({blockOpen.length})
-                </Button>
+              {restCount > 0 && (
+                <div className="border-t border-divider p-3">
+                  <Button variant="secondary" onClick={() => restOk(block)}>
+                    <Icon name="check" />
+                    Rest goed ({restCount})
+                  </Button>
+                </div>
               )}
             </Accordion>
           )
@@ -225,20 +258,12 @@ export function ChecklistPage() {
 
       {sheet?.kind === 'measure' && sheetItem && (
         <MeasureSheet
+          key={sheetItem.id}
           item={sheetItem}
           readingId={sheet.readingId}
           onClose={() => setSheet(null)}
-          onFinish={(suggest) =>
-            setSheet(
-              suggest && (sheetItem.status === 'open' || sheetItem.status === 'ok')
-                ? { kind: 'fault', itemId: sheetItem.id, suggest }
-                : null,
-            )
-          }
+          onFinish={(values) => finishMeasuring(sheetItem, values)}
         />
-      )}
-      {sheet?.kind === 'fault' && sheetItem && (
-        <FaultSheet item={sheetItem} suggest={sheet.suggest} onClose={() => setSheet(null)} />
       )}
       {sheet?.kind === 'discard' && (
         <BottomSheet

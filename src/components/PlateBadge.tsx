@@ -28,7 +28,7 @@ export function PlateField({ id, label, ...props }: PlateFieldProps) {
       <label htmlFor={id} className="text-base font-semibold">
         {label}
       </label>
-      <div className="flex h-[60px] items-stretch overflow-hidden rounded-sm border-2 border-ink bg-plate font-bold tracking-[0.06em] text-ink focus-within:shadow-[0_0_0_2px_var(--color-charcoal)]">
+      <div className="flex h-14 items-stretch overflow-hidden rounded-sm border-2 border-ink bg-plate font-bold tracking-[0.06em] text-ink focus-within:shadow-[0_0_0_2px_var(--color-charcoal)]">
         <span
           aria-hidden="true"
           className="flex w-5 flex-none items-end justify-center bg-plate-eu px-[3px] pb-0.5 text-[10px] tracking-normal text-white"
@@ -41,7 +41,7 @@ export function PlateField({ id, label, ...props }: PlateFieldProps) {
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full min-w-0 flex-1 bg-transparent px-1 text-center text-[21px] tracking-[0.04em] uppercase focus:outline-none"
+          className="w-full min-w-0 flex-1 bg-transparent px-1 text-center text-xl tracking-[0.04em] uppercase focus:outline-none"
           {...props}
         />
       </div>

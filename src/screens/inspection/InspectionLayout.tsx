@@ -12,8 +12,10 @@ import {
   saveReading,
   type InspectionBundle,
 } from '../../inspection/api'
-import { InspectionContext, type InspectionContextValue } from '../../inspection/InspectionContext'
+import { InspectionContext, type InspectionContextValue, type PendingPhoto } from '../../inspection/InspectionContext'
+import { deletePhoto, photoPath, rememberPhotoUrl, removeFiles, resizePhoto, savePhoto } from '../../inspection/photos'
 import { previousItems } from '../../inspection/rules'
+import type { InspectionItem } from '../../inspection/types'
 import { useLoad } from '../../lib/useLoad'
 
 /** Loads one inspection and shares it with the checklist, the check and the summary. */
@@ -101,17 +103,20 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
   )
 
   const setReadingValue = useCallback<InspectionContextValue['setReadingValue']>(
-    async (readingId, value) => {
+    async (readingId, value, orMore = false) => {
+      const flag = value !== null && orMore
       update((data) =>
         data && {
           ...data,
           items: data.items.map((item) => ({
             ...item,
-            readings: item.readings.map((reading) => (reading.id === readingId ? { ...reading, value } : reading)),
+            readings: item.readings.map((reading) =>
+              reading.id === readingId ? { ...reading, value, or_more: flag } : reading,
+            ),
           })),
         },
       )
-      await save(() => saveReading(readingId, value))
+      await save(() => saveReading(readingId, value, flag))
     },
     [save, update],
   )
@@ -139,7 +144,76 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
     [inspectionId, reload, save, update],
   )
 
-  const discard = useCallback(() => save(() => discardInspection(inspectionId)), [inspectionId, save])
+  // The photo rows go with the draft; the files are deleted after that, see photos.ts.
+  const discard = useCallback(async () => {
+    const paths = bundle.items.flatMap((item) => item.photos.map((photo) => photo.path))
+    const discarded = await save(() => discardInspection(inspectionId))
+    if (discarded) void removeFiles(paths).catch(() => {})
+    return discarded
+  }, [bundle.items, inspectionId, save])
+
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([])
+
+  const changeItem = useCallback(
+    (itemId: string, change: (item: InspectionItem) => InspectionItem) => {
+      update((data) => data && { ...data, items: data.items.map((item) => (item.id === itemId ? change(item) : item)) })
+    },
+    [update],
+  )
+
+  const upload = useCallback(
+    async (pending: PendingPhoto) => {
+      const path = photoPath(inspectionId, pending.itemId, pending.id)
+      try {
+        const photo = await savePhoto(pending.itemId, path, pending.blob)
+        rememberPhotoUrl(path, pending.previewUrl)
+        changeItem(pending.itemId, (item) => ({ ...item, photos: [...item.photos, photo] }))
+        setPendingPhotos((list) => list.filter((other) => other.id !== pending.id))
+      } catch {
+        setPendingPhotos((list) => list.map((other) => (other.id === pending.id ? { ...other, failed: true } : other)))
+      }
+    },
+    [changeItem, inspectionId],
+  )
+
+  const addPhoto = useCallback<InspectionContextValue['addPhoto']>(
+    async (itemId, file) => {
+      let blob: Blob
+      try {
+        blob = await resizePhoto(file)
+      } catch {
+        return false
+      }
+      const pending = { id: crypto.randomUUID(), itemId, blob, previewUrl: URL.createObjectURL(blob), failed: false }
+      setPendingPhotos((list) => [...list, pending])
+      void upload(pending)
+      return true
+    },
+    [upload],
+  )
+
+  // A new file name: the failed attempt may have left its file behind.
+  const retryPhoto = useCallback<InspectionContextValue['retryPhoto']>(
+    (pending) => {
+      const again = { ...pending, id: crypto.randomUUID(), failed: false }
+      setPendingPhotos((list) => list.map((other) => (other.id === pending.id ? again : other)))
+      void upload(again)
+    },
+    [upload],
+  )
+
+  const removePhoto = useCallback<InspectionContextValue['removePhoto']>(
+    async (photo) => {
+      update((data) =>
+        data && {
+          ...data,
+          items: data.items.map((item) => ({ ...item, photos: item.photos.filter((other) => other.id !== photo.id) })),
+        },
+      )
+      await save(() => deletePhoto(photo.id))
+    },
+    [save, update],
+  )
 
   const previousByPoint = useMemo(() => previousItems(bundle.previous), [bundle.previous])
 
@@ -154,8 +228,26 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
       setReadingValue,
       complete,
       discard,
+      pendingPhotos,
+      addPhoto,
+      retryPhoto,
+      removePhoto,
     }),
-    [inspection, bundle.items, bundle.previous, previousByPoint, saveFailed, setResults, setReadingValue, complete, discard],
+    [
+      inspection,
+      bundle.items,
+      bundle.previous,
+      previousByPoint,
+      saveFailed,
+      setResults,
+      setReadingValue,
+      complete,
+      discard,
+      pendingPhotos,
+      addPhoto,
+      retryPhoto,
+      removePhoto,
+    ],
   )
 
   return (

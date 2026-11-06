@@ -45,7 +45,7 @@ export function AppShell({ panel, headerStart, subheader, footer, children }: Ap
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-4 px-4 py-[18px]">
+      <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-3 px-4 py-3.5">
         {children}
       </main>
 

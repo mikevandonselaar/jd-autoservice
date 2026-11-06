@@ -10,7 +10,7 @@ export function OptionButton({ selected, className = '', type = 'button', ...pro
     <button
       type={type}
       aria-pressed={selected}
-      className={`flex min-h-14 cursor-pointer items-center justify-center rounded-sm border-2 px-2 text-center text-[17px] leading-tight ${
+      className={`flex min-h-14 cursor-pointer items-center justify-center rounded-sm border-2 px-2 text-center text-lg leading-tight ${
         selected
           ? 'border-charcoal bg-charcoal font-bold text-white'
           : 'border-edge bg-surface font-semibold text-ink'

@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { findings } from './rules'
 import type {
   AdviceTerm,
   Checklist,
@@ -7,6 +8,7 @@ import type {
   InspectionItem,
   ItemStatus,
   PartType,
+  Photo,
   PreviousVisit,
 } from './types'
 
@@ -18,7 +20,10 @@ function unwrap<T>({ data, error }: { data: unknown; error: PostgrestError | nul
 
 const ITEM_COLUMNS =
   'id, inspection_id, block_name, block_sort, label, sort, reason_options, status, term, reason, ' +
-  'readings:inspection_readings(id, item_id, label, unit, direction, advice_limit, fault_limit, sort, value)'
+  'readings:inspection_readings(id, item_id, label, unit, direction, advice_limit, fault_limit, or_more_value, sort, value, or_more), ' +
+  'photos:inspection_photos(id, path, created_at)'
+
+const byCreated = (a: Photo, b: Photo) => a.created_at.localeCompare(b.created_at)
 
 const INSPECTION_COLUMNS =
   'id, plate, plate_key, odometer_km, checklist_name, mechanic_id, status, note, started_at, completed_at'
@@ -27,7 +32,10 @@ async function fetchItems(inspectionId: string): Promise<InspectionItem[]> {
   const items = unwrap<InspectionItem[]>(
     await supabase.from('inspection_items').select(ITEM_COLUMNS).eq('inspection_id', inspectionId),
   )
-  for (const item of items) item.readings.sort((a, b) => a.sort - b.sort)
+  for (const item of items) {
+    item.readings.sort((a, b) => a.sort - b.sort)
+    item.photos.sort(byCreated)
+  }
   return items.sort((a, b) => a.block_sort - b.block_sort || a.sort - b.sort)
 }
 
@@ -85,6 +93,39 @@ export async function fetchMyDrafts(userId: string): Promise<Draft[]> {
   )
 }
 
+/** A completed inspection with only the points that need a call or a later visit. */
+export type CompletedInspection = Pick<
+  Inspection,
+  'id' | 'plate' | 'odometer_km' | 'checklist_name' | 'note' | 'completed_at'
+> & {
+  completed_at: string
+  findings: Pick<InspectionItem, 'label' | 'block_name' | 'block_sort' | 'sort' | 'status' | 'term' | 'reason' | 'photos'>[]
+}
+
+/** Completed inspections of today and the `days - 1` days before, newest first. */
+export async function fetchCompleted(days: number): Promise<CompletedInspection[]> {
+  const since = new Date()
+  since.setHours(0, 0, 0, 0)
+  since.setDate(since.getDate() - (days - 1))
+
+  const rows = unwrap<(Omit<CompletedInspection, 'findings'> & { inspection_items: CompletedInspection['findings'] })[]>(
+    await supabase
+      .from('inspections')
+      .select(
+        'id, plate, odometer_km, checklist_name, note, completed_at, ' +
+          'inspection_items(label, block_name, block_sort, sort, status, term, reason, ' +
+          'photos:inspection_photos(id, path, created_at))',
+      )
+      .eq('status', 'completed')
+      .gte('completed_at', since.toISOString())
+      // Only limits the embedded points; inspections without any stay in the list.
+      .in('inspection_items.status', ['fault', 'advice'])
+      .order('completed_at', { ascending: false }),
+  )
+  for (const row of rows) for (const item of row.inspection_items) item.photos.sort(byCreated)
+  return rows.map(({ inspection_items, ...inspection }) => ({ ...inspection, findings: findings(inspection_items) }))
+}
+
 export async function startInspection(checklistId: string, plate: string, odometerKm: number): Promise<string> {
   return unwrap(
     await supabase.rpc('start_inspection', {
@@ -111,8 +152,8 @@ export async function saveItemResults(
   )
 }
 
-export async function saveReading(readingId: string, value: number | null): Promise<void> {
-  unwrap(await supabase.rpc('set_reading', { p_reading_id: readingId, p_value: value }))
+export async function saveReading(readingId: string, value: number | null, orMore: boolean): Promise<void> {
+  unwrap(await supabase.rpc('set_reading', { p_reading_id: readingId, p_value: value, p_or_more: orMore }))
 }
 
 export async function completeInspection(id: string, note: string): Promise<void> {
@@ -153,6 +194,7 @@ export type ChecklistContent = {
         direction: 'lower_is_worse' | 'higher_is_worse'
         advice_limit: number | null
         fault_limit: number | null
+        or_more_value: number | null
         sort: number
       }[]
     }[]
@@ -166,7 +208,7 @@ export async function fetchChecklistContent(id: string): Promise<ChecklistConten
       .from('checklists')
       .select(
         'id, name, blocks:checklist_blocks(name, sort, points:checklist_points(label, sort, part_type_id, ' +
-          'measurements:checklist_measurements(label, unit, direction, advice_limit, fault_limit, sort)))',
+          'measurements:checklist_measurements(label, unit, direction, advice_limit, fault_limit, or_more_value, sort)))',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -192,6 +234,7 @@ export type ChecklistPayload = {
       direction: 'lower_is_worse' | 'higher_is_worse'
       advice_limit: number | null
       fault_limit: number | null
+      or_more_value: number | null
     }[]
   }[]
 }[]

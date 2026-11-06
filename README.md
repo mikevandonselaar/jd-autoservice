@@ -18,6 +18,7 @@ npm run dev              # http://localhost:5173
 | `npm run lint` | ESLint |
 | `npm run test:db` | pgTAP tests in `supabase/tests` against the test project |
 | `npm run test:auth` | Checks that sign-up is closed on the test project |
+| `npm run login-link -- <email> [app url]` | Prints a login code and link for an existing user on the test project, without sending mail |
 
 ## Manual steps in Supabase
 

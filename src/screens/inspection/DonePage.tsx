@@ -63,7 +63,7 @@ export function DonePage() {
             {advice.map((item) => (
               <div
                 key={item.id}
-                className="flex min-h-[52px] items-center justify-between gap-2.5 border-b border-divider px-3.5 py-1.5 last:border-b-0"
+                className="flex min-h-12 items-center justify-between gap-2.5 border-b border-divider px-3.5 py-1.5 last:border-b-0"
               >
                 <span>{item.label}</span>
                 <span className="rounded-sm border-2 border-advice bg-advice-tint px-2 py-0.5 font-bold whitespace-nowrap text-advice-ink">

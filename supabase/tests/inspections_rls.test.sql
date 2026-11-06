@@ -2,7 +2,7 @@
 -- and `supabase test db` can run it. Everything happens in one rolled-back transaction.
 begin;
 
-select plan(61);
+select plan(72);
 
 -- Fixtures. Fixed ids start with c0000000, so they cannot clash with the dev seed.
 --   ...0a admin   ...01 employee   ...02 employee   ...03 workshop   ...04 employee, ended yesterday
@@ -255,6 +255,51 @@ select throws_ok(
   'a measurement with three decimals is rejected'
 );
 
+select is(
+  (select count(*) from public.inspection_readings r join public.inspection_items i on i.id = r.item_id
+   where i.inspection_id = pg_temp.saved('insp') and r.or_more_value = 5),
+  4::bigint,
+  'the four tyres copied the "5 or more" value'
+);
+
+select set_config('test.tyre', (select r.id::text from public.inspection_readings r
+  join public.inspection_items i on i.id = r.item_id
+  where i.inspection_id = pg_temp.saved('insp') and r.label = 'LV'), true);
+
+select lives_ok(
+  $$ select public.set_reading(pg_temp.saved('tyre'), 5, true) $$,
+  'employee saves "5 or more"'
+);
+
+select is(
+  (select value || ' ' || or_more from public.inspection_readings where id = pg_temp.saved('tyre')),
+  '5.00 true',
+  'the value is stored with the "or more" flag'
+);
+
+select throws_ok(
+  $$ select public.set_reading(pg_temp.saved('tyre'), 4.5, true) $$,
+  '22023', null,
+  '"or more" is rejected for another value than the one of the measurement'
+);
+
+select throws_ok(
+  $$ select public.set_reading(pg_temp.saved('tyre'), null, true) $$,
+  '22023', null,
+  '"or more" without a value is rejected'
+);
+
+select lives_ok(
+  $$ select public.set_reading(pg_temp.saved('tyre'), 4.5) $$,
+  'employee types an exact value over "5 or more"'
+);
+
+select is(
+  (select value || ' ' || or_more from public.inspection_readings where id = pg_temp.saved('tyre')),
+  '4.50 false',
+  'an exact value clears the "or more" flag'
+);
+
 select throws_ok(
   $$ update public.inspection_items set status = 'ok' where inspection_id = pg_temp.saved('insp') $$,
   '42501', null,
@@ -268,7 +313,7 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$ select public.admin_save_checklist(null, 'Kleine beurt', '[{"name":"A","points":[{"label":"B"}]}]') $$,
+  $$ select public.admin_save_checklist(null, 'Testlijst', '[{"name":"A","points":[{"label":"B"}]}]') $$,
   '42501', 'not allowed',
   'employee cannot create a checklist'
 );
@@ -378,7 +423,7 @@ select throws_ok(
 );
 
 select ok(
-  set_config('test.small', public.admin_save_checklist(null, ' Kleine beurt ', $json$
+  set_config('test.small', public.admin_save_checklist(null, ' Testlijst ', $json$
     [{"name": "Onder de motorkap", "points": [{"label": "Accu", "part_type": "Koppeling"}, {"label": "Olie"}]},
      {"name": "Wielen", "points": [{"label": "Banden", "measurements": [
        {"label": "LV", "unit": "mm", "advice_limit": 4, "fault_limit": 1.6}]}]}]
@@ -426,6 +471,38 @@ select throws_ok(
        "measurements": [{"label": "X", "unit": "mm", "direction": "sideways"}]}]}]') $$,
   '22023', null,
   'an unknown direction is rejected'
+);
+
+select throws_ok(
+  $$ select public.admin_save_checklist(null, 'Fout', '[{"name": "A", "points": [{"label": "B",
+       "measurements": [{"label": "LV", "unit": "mm", "advice_limit": 4, "fault_limit": 1.6,
+         "or_more_value": 3}]}]}]') $$,
+  '22023', null,
+  'an "or more" value below the advice limit is rejected'
+);
+
+select throws_ok(
+  $$ select public.admin_save_checklist(null, 'Fout', '[{"name": "A", "points": [{"label": "B",
+       "measurements": [{"label": "Vocht", "unit": "%", "direction": "higher_is_worse",
+         "advice_limit": 1, "fault_limit": 2, "or_more_value": 3}]}]}]') $$,
+  '22023', null,
+  'an "or more" value is rejected when higher is worse'
+);
+
+select lives_ok(
+  $$ select public.admin_save_checklist(null, 'Bandenlijst', '[{"name": "A", "points": [{"label": "Banden",
+       "measurements": [{"label": "LV", "unit": "mm", "advice_limit": 4, "fault_limit": 1.6,
+         "or_more_value": 5}]}]}]') $$,
+  'admin saves a measurement with an "or more" value'
+);
+
+select is(
+  (select m.or_more_value from public.checklist_measurements m
+   join public.checklist_points p on p.id = m.point_id
+   join public.checklist_blocks b on b.id = p.block_id
+   join public.checklists c on c.id = b.checklist_id where c.name = 'Bandenlijst'),
+  5.00::numeric,
+  'the "or more" value is stored'
 );
 
 select throws_ok(

@@ -127,7 +127,7 @@ export function LoginPage() {
           autoComplete="one-time-code"
           maxLength={6}
           pattern="[0-9]{6}"
-          className="text-center text-[26px] font-bold tracking-[0.3em]"
+          className="text-center text-2xl font-bold tracking-[0.3em]"
           value={code}
           onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
         />

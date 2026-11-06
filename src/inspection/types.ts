@@ -10,8 +10,19 @@ export type Reading = {
   direction: Direction
   advice_limit: number | null
   fault_limit: number | null
+  /** The quick value "this or more", for example 5 mm of tyre tread. Null: none. */
+  or_more_value: number | null
   sort: number
   value: number | null
+  /** The value is "or more": at least `value`, not measured exactly. */
+  or_more: boolean
+}
+
+/** A photo of a point. The file is in the bucket at `path`, see photos.ts. */
+export type Photo = {
+  id: string
+  path: string
+  created_at: string
 }
 
 /** One point of an inspection, with its own copy of the checklist data. */
@@ -27,6 +38,8 @@ export type InspectionItem = {
   term: AdviceTerm | null
   reason: string | null
   readings: Reading[]
+  /** Oldest first. */
+  photos: Photo[]
 }
 
 export type Inspection = {

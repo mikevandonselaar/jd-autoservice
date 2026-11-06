@@ -1,0 +1,11 @@
+[ 3418277ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3419226ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3420101ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3421180ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3421997ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3426322ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3464296ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5199/@vite/client:1089
+[ 3535999ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=f5f20851:15801
+[ 3536045ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://rbhfgqhhuhftopwwysmw.supabase.co/rest/v1/employees?select=user_id%2Cname%2Crole&user_id=eq.872e5d84-b80d-4bc8-b267-d50bdd5634bd:0
+[ 3537073ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://rbhfgqhhuhftopwwysmw.supabase.co/rest/v1/employees?select=user_id%2Cname%2Crole&user_id=eq.872e5d84-b80d-4bc8-b267-d50bdd5634bd:0
+[ 3539025ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5199/@vite/client:1089

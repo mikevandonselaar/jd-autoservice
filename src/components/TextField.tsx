@@ -16,7 +16,7 @@ export function TextField({ id, label, hint, className = '', ...props }: TextFie
       <input
         id={id}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className={`h-[60px] w-full rounded-sm border-2 border-edge bg-surface px-3 text-lg text-ink focus:border-charcoal focus:shadow-[0_0_0_1px_var(--color-charcoal)] focus:outline-none ${className}`}
+        className={`h-14 w-full rounded-sm border-2 border-edge bg-surface px-3 text-lg text-ink focus:border-charcoal focus:shadow-[0_0_0_1px_var(--color-charcoal)] focus:outline-none ${className}`}
         {...props}
       />
       {hint && (

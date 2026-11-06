@@ -10,6 +10,7 @@ import { HomePage } from './screens/HomePage'
 import { ChecklistPage } from './screens/inspection/ChecklistPage'
 import { DonePage } from './screens/inspection/DonePage'
 import { InspectionLayout } from './screens/inspection/InspectionLayout'
+import { OverviewPage } from './screens/inspection/OverviewPage'
 import { ReviewPage } from './screens/inspection/ReviewPage'
 import { StartPage } from './screens/inspection/StartPage'
 import { LoginPage } from './screens/LoginPage'
@@ -24,6 +25,7 @@ export function App() {
 
         {/* The workshop account has no access to inspections. */}
         <Route element={<RequireRole roles={['employee', 'admin']} />}>
+          <Route path="/inspecties" element={<OverviewPage />} />
           <Route path="/inspectie/nieuw" element={<StartPage />} />
           <Route path="/inspectie/:id" element={<InspectionLayout />}>
             <Route index element={<ChecklistPage />} />

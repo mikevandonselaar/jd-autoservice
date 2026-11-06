@@ -151,7 +151,7 @@ function Editor({ id, content, partTypes, header }: EditorProps) {
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpenBlock(open ? null : block.key)}
-                className="flex min-h-[60px] min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-3.5 text-left"
+                className="flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-3.5 text-left"
               >
                 <Icon name="next" className={`size-4 text-charcoal ${open ? 'rotate-90' : ''}`} />
                 <span className="min-w-0 flex-1">

@@ -26,7 +26,7 @@ export function Accordion({ title, badge, complete = false, marker, count, open,
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={panelId}
-          className="flex min-h-[60px] w-full cursor-pointer items-center gap-2.5 bg-surface px-4 text-left uppercase"
+          className="flex min-h-14 w-full cursor-pointer items-center gap-2.5 bg-surface px-4 text-left uppercase"
         >
           <span
             className={`flex size-[30px] flex-none items-center justify-center rounded-sm text-base font-bold ${
@@ -41,7 +41,8 @@ export function Accordion({ title, badge, complete = false, marker, count, open,
           <Icon name={open ? 'up' : 'down'} className="size-[18px] text-charcoal" />
         </button>
       </h3>
-      <div id={panelId} hidden={!open} className="flex flex-col gap-2.5 bg-surface px-4 pt-1 pb-3.5">
+      {/* No padding: the rows run edge to edge and set their own. */}
+      <div id={panelId} hidden={!open} className="bg-surface">
         {children}
       </div>
     </section>

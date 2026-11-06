@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { AppShell, BackHeader } from '../../components/AppShell'
 import { Button } from '../../components/Button'
+import { FindingBadge } from '../../components/FindingBadge'
 import { Icon, type IconName } from '../../components/icons'
 import { Notice } from '../../components/Notice'
 import { PlateBadge } from '../../components/PlateBadge'
 import { SectionLabel } from '../../components/SectionLabel'
 import { TextArea } from '../../components/TextArea'
 import { useInspection } from '../../inspection/InspectionContext'
-import { countByStatus, findings, priorAdvice, readingState, readingsSummary, termLabel } from '../../inspection/rules'
-import type { InspectionItem, ItemStatus } from '../../inspection/types'
-import { formatNumber } from '../../lib/format'
-import { FaultSheet } from './FaultSheet'
+import { usePhotoUrls } from '../../inspection/photos'
+import { countByStatus, findings, formatReading, priorAdvice, readingState, readingsSummary } from '../../inspection/rules'
+import type { ItemStatus } from '../../inspection/types'
 
 const counters: { status: ItemStatus; label: string; icon: IconName; tone: string }[] = [
   { status: 'ok', label: 'Goed', icon: 'check', tone: 'text-good-ink' },
@@ -20,28 +20,20 @@ const counters: { status: ItemStatus; label: string; icon: IconName; tone: strin
   { status: 'fault', label: 'Fout', icon: 'warning', tone: 'text-fault-ink' },
 ]
 
-function badgeFor(item: InspectionItem): { text: string; classes: string } {
-  if (item.status === 'fault') return { text: 'Nu', classes: 'border-fault bg-fault text-white' }
-  if (item.status === 'advice') {
-    return { text: item.term ? termLabel[item.term] : 'Advies', classes: 'border-advice bg-advice-tint text-advice-ink' }
-  }
-  return { text: 'Gerepareerd', classes: 'border-good bg-good-tint text-good-ink' }
-}
-
 /** M5: everything that was found, before the inspection is completed. */
 export function ReviewPage() {
   const navigate = useNavigate()
   const { inspection, items, previousByPoint, saveFailed, complete } = useInspection()
   const [note, setNote] = useState(inspection.note ?? '')
-  const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const found = findings(items)
+  // The first photo of each finding, as a thumbnail.
+  const urlOf = usePhotoUrls(found.flatMap((item) => item.photos.slice(0, 1).map((photo) => photo.path)))
 
   if (inspection.status === 'completed') return <Navigate to={`/inspectie/${inspection.id}/klaar`} replace />
 
   const counts = countByStatus(items)
-  const found = findings(items)
   const measured = items.filter((item) => item.readings.some((reading) => reading.value !== null))
-  const editing = items.find((item) => item.id === editId)
 
   async function finish() {
     setSaving(true)
@@ -76,7 +68,7 @@ export function ReviewPage() {
         {counters.map(({ status, label, icon, tone }) => (
           <div
             key={status}
-            className={`flex min-h-[52px] items-center gap-2.5 rounded-sm border border-divider bg-surface px-3 font-semibold ${tone}`}
+            className={`flex min-h-12 items-center gap-2.5 rounded-sm border border-divider bg-surface px-3 font-semibold ${tone}`}
           >
             <Icon name={icon} className="size-[18px]" strokeWidth={2.6} />
             {label}
@@ -91,7 +83,6 @@ export function ReviewPage() {
       ) : (
         <div className="-mt-2 overflow-hidden rounded-sm border border-divider bg-surface">
           {found.map((item) => {
-            const badge = badgeFor(item)
             const detail = [
               readingsSummary(item),
               item.reason,
@@ -103,18 +94,27 @@ export function ReviewPage() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setEditId(item.id)}
-                className="flex min-h-[60px] w-full cursor-pointer items-center gap-2.5 border-b border-divider px-3 py-1.5 text-left last:border-b-0"
+                onClick={() => navigate(`/inspectie/${inspection.id}`, { state: { expand: item.id } })}
+                className="flex min-h-14 w-full cursor-pointer items-center gap-2.5 border-b border-divider px-3 py-1.5 text-left last:border-b-0"
               >
-                <span
-                  className={`flex min-h-[30px] w-[104px] flex-none items-center justify-center rounded-sm border-2 p-0.5 text-center text-base leading-tight font-bold ${badge.classes}`}
-                >
-                  {badge.text}
-                </span>
+                <FindingBadge status={item.status} term={item.term} className="w-[104px]" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold">{item.label}</span>
                   {detail && <span className="block text-muted">{detail}</span>}
                 </span>
+                {item.photos.length > 0 && (
+                  <span className="relative flex size-11 flex-none items-center justify-center rounded-sm border border-edge bg-divider text-muted">
+                    {urlOf(item.photos[0].path) ? (
+                      <img src={urlOf(item.photos[0].path)} alt="" className="size-full rounded-sm object-cover" />
+                    ) : (
+                      <Icon name="image" className="size-5" strokeWidth={2} />
+                    )}
+                    <b className="absolute -right-1.5 -bottom-1.5 min-w-[22px] rounded-full bg-charcoal px-1.5 text-center text-base leading-[22px] text-white">
+                      {item.photos.length}
+                    </b>
+                    <span className="sr-only">{item.photos.length === 1 ? '1 foto' : `${item.photos.length} foto's`}</span>
+                  </span>
+                )}
                 <Icon name="next" className="size-4 text-charcoal" />
               </button>
             )
@@ -132,17 +132,19 @@ export function ReviewPage() {
                 <span>
                   {item.readings.map((reading, index) => {
                     const state = readingState(reading)
+                    const last = index === item.readings.length - 1
                     return (
-                      <span key={reading.id}>
-                        {index > 0 && ' · '}
+                      // One entry never wraps in the middle; the unit stays with the last one.
+                      <span key={reading.id} className="whitespace-nowrap">
+                        {index > 0 && '· '}
                         {item.readings.length > 1 && `${reading.label} `}
                         <b className={state === 'fault' ? 'text-fault-ink' : state === 'advice' ? 'text-advice-ink' : ''}>
-                          {reading.value === null ? '–' : formatNumber(reading.value)}
+                          {formatReading(reading)}
                         </b>
+                        {last ? ` ${reading.unit}` : ' '}
                       </span>
                     )
-                  })}{' '}
-                  {item.readings[0].unit}
+                  })}
                 </span>
               </div>
             ))}
@@ -159,8 +161,6 @@ export function ReviewPage() {
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
-
-      {editing && <FaultSheet item={editing} suggest={null} onClose={() => setEditId(null)} />}
     </AppShell>
   )
 }

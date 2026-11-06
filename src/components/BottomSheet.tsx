@@ -45,7 +45,7 @@ export function BottomSheet({ title, eyebrow, onClose, footer, children }: Botto
             {eyebrow && (
               <p className="font-heading text-base font-bold tracking-[0.08em] text-muted uppercase">{eyebrow}</p>
             )}
-            <h2 id={titleId} className="text-[21px]">
+            <h2 id={titleId} className="text-xl">
               {title}
             </h2>
           </div>

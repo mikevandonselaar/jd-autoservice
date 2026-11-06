@@ -1,5 +1,16 @@
 import { createContext, useContext } from 'react'
-import type { AdviceTerm, Inspection, InspectionItem, ItemStatus, PreviousVisit } from './types'
+import type { AdviceTerm, Inspection, InspectionItem, ItemStatus, Photo, PreviousVisit } from './types'
+
+/** A photo taken on this phone that is not saved yet, or could not be saved. */
+export type PendingPhoto = {
+  /** Also the file name in the bucket. A retry gets a new one. */
+  id: string
+  itemId: string
+  blob: Blob
+  /** Object URL of the blob, to show it before and after saving. */
+  previewUrl: string
+  failed: boolean
+}
 
 export type InspectionContextValue = {
   inspection: Inspection
@@ -11,11 +22,18 @@ export type InspectionContextValue = {
   saveFailed: boolean
   /** Sets the result of one or more points at once. Shown at once, saved in the background. */
   setResults: (ids: string[], status: ItemStatus, term: AdviceTerm | null, reason: string | null) => Promise<void>
-  setReadingValue: (readingId: string, value: number | null) => Promise<void>
+  /** Saves one measured value; `orMore` says it is "this or more", like 5 mm tread or more. */
+  setReadingValue: (readingId: string, value: number | null, orMore?: boolean) => Promise<void>
   /** Completes the draft. False when it failed. */
   complete: (note: string) => Promise<boolean>
-  /** Throws the draft away. False when it failed. */
+  /** Throws the draft away, and then its photo files. False when it failed. */
   discard: () => Promise<boolean>
+  pendingPhotos: PendingPhoto[]
+  /** Makes the photo smaller and saves it in the background. False when the file cannot be read. */
+  addPhoto: (itemId: string, file: File) => Promise<boolean>
+  retryPhoto: (pending: PendingPhoto) => void
+  /** Removes a saved photo. Shown at once, saved in the background. */
+  removePhoto: (photo: Photo) => Promise<void>
 }
 
 export const InspectionContext = createContext<InspectionContextValue | null>(null)

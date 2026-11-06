@@ -4,6 +4,11 @@ import { formatNumber } from '../../lib/format'
 
 // The checklist as it is edited on screen. Limits stay text while typing; "3,5" is valid.
 
+// React keys and element ids. A counter, because crypto.randomUUID needs https and the app is
+// also opened over plain http on the local network during development.
+let keyCount = 0
+const nextKey = () => `k${(keyCount += 1)}`
+
 export type DraftMeasurement = {
   key: string
   label: string
@@ -11,6 +16,8 @@ export type DraftMeasurement = {
   direction: Direction
   advice: string
   fault: string
+  /** The quick value "this or more", like 5 for tyres. Blank is none. Only when lower is worse. */
+  orMore: string
 }
 
 export type DraftPoint = {
@@ -26,17 +33,18 @@ export type DraftBlock = { key: string; name: string; points: DraftPoint[] }
 export type Draft = { name: string; blocks: DraftBlock[] }
 
 export const newMeasurement = (): DraftMeasurement => ({
-  key: crypto.randomUUID(),
+  key: nextKey(),
   label: '',
   unit: 'mm',
   direction: 'lower_is_worse',
   advice: '',
   fault: '',
+  orMore: '',
 })
 
-export const newPoint = (): DraftPoint => ({ key: crypto.randomUUID(), label: '', partTypeId: '', measurements: [] })
+export const newPoint = (): DraftPoint => ({ key: nextKey(), label: '', partTypeId: '', measurements: [] })
 
-export const newBlock = (): DraftBlock => ({ key: crypto.randomUUID(), name: '', points: [newPoint()] })
+export const newBlock = (): DraftBlock => ({ key: nextKey(), name: '', points: [newPoint()] })
 
 export const emptyDraft = (): Draft => ({ name: '', blocks: [newBlock()] })
 
@@ -44,19 +52,20 @@ export function draftFromContent(content: ChecklistContent): Draft {
   return {
     name: content.name,
     blocks: content.blocks.map((block) => ({
-      key: crypto.randomUUID(),
+      key: nextKey(),
       name: block.name,
       points: block.points.map((point) => ({
-        key: crypto.randomUUID(),
+        key: nextKey(),
         label: point.label,
         partTypeId: point.part_type_id ?? '',
         measurements: point.measurements.map((measurement) => ({
-          key: crypto.randomUUID(),
+          key: nextKey(),
           label: measurement.label,
           unit: measurement.unit,
           direction: measurement.direction,
           advice: measurement.advice_limit === null ? '' : formatNumber(measurement.advice_limit),
           fault: measurement.fault_limit === null ? '' : formatNumber(measurement.fault_limit),
+          orMore: measurement.or_more_value === null ? '' : formatNumber(measurement.or_more_value),
         })),
       })),
     })),
@@ -69,6 +78,9 @@ function parseLimit(text: string): number | null {
   const value = Number(text.trim().replace(',', '.'))
   return Number.isFinite(value) && value >= 0 && value <= 9999 ? value : Number.NaN
 }
+
+/** "Of meer" only makes sense when a lower value is worse; otherwise it is ignored. */
+const orMoreOf = (m: DraftMeasurement) => (m.direction === 'lower_is_worse' ? parseLimit(m.orMore) : null)
 
 const between = (text: string, max: number) => text.trim().length >= 1 && text.trim().length <= max
 
@@ -89,8 +101,12 @@ export function validate(draft: Draft): string | null {
         if (!between(m.unit, 10)) return `${pointWhere}: geef elke meting een eenheid van maximaal 10 tekens.`
         const advice = parseLimit(m.advice)
         const fault = parseLimit(m.fault)
-        if (Number.isNaN(advice) || Number.isNaN(fault)) {
+        const orMore = orMoreOf(m)
+        if (Number.isNaN(advice) || Number.isNaN(fault) || Number.isNaN(orMore)) {
           return `${pointWhere}, meting ${m.label.trim()}: een grens is een getal van 0 tot 9999.`
+        }
+        if (orMore !== null && (advice === null || orMore < advice)) {
+          return `${pointWhere}, meting ${m.label.trim()}: 'of meer' begint bij de adviesgrens of hoger.`
         }
         if (advice !== null && fault !== null) {
           const wrongWay = m.direction === 'lower_is_worse' ? fault > advice : fault < advice
@@ -116,6 +132,7 @@ export function toPayload(draft: Draft, partTypes: PartType[]): ChecklistPayload
         direction: m.direction,
         advice_limit: parseLimit(m.advice),
         fault_limit: parseLimit(m.fault),
+        or_more_value: orMoreOf(m),
       })),
     })),
   }))

@@ -171,6 +171,16 @@ export function PointEditor({
                   onChange={(event) => changeMeasurement(index, { fault: event.target.value })}
                 />
               </div>
+              {measurement.direction === 'lower_is_worse' && (
+                <TextField
+                  id={`${measurement.key}-or-more`}
+                  label="Snelkeuze 'of meer' vanaf"
+                  hint="Bijvoorbeeld 5 bij banden: één tik vult dan '5 of meer' in. Leeg laten voor niets."
+                  inputMode="decimal"
+                  value={measurement.orMore}
+                  onChange={(event) => changeMeasurement(index, { orMore: event.target.value })}
+                />
+              )}
               <Button
                 variant="secondary"
                 onClick={() =>

@@ -33,6 +33,26 @@ const paths = {
       <path d="M13 9l5 6M18 9l-5 6" />
     </>
   ),
+  pencil: <path d="M4 20h4L19 9l-4-4L4 16z" />,
+  camera: (
+    <>
+      <path d="M4 8h3l2-3h6l2 3h3v12H4z" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  ruler: (
+    <>
+      <path d="M3 17L17 3l4 4L7 21z" />
+      <path d="M7.5 12.5l2 2M10.5 9.5l2 2M13.5 6.5l2 2" />
+    </>
+  ),
 }
 
 export type IconName = keyof typeof paths

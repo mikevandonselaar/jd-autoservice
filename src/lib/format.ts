@@ -20,6 +20,22 @@ export function formatDay(iso: string): string {
   return plain(new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }))
 }
 
+/** "10:42" */
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+}
+
+/** "Vandaag", "Gisteren" or "do 29 okt". */
+export function formatDayName(iso: string): string {
+  const date = new Date(iso)
+  const days = Math.round(
+    (new Date().setHours(0, 0, 0, 0) - new Date(date).setHours(0, 0, 0, 0)) / (24 * 60 * 60 * 1000),
+  )
+  if (days === 0) return 'Vandaag'
+  if (days === 1) return 'Gisteren'
+  return plain(date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }))
+}
+
 /** "do 29 okt · 10:42" */
 export function formatDayTime(iso: string): string {
   const date = new Date(iso)
