@@ -25,6 +25,9 @@ export type DraftPoint = {
   label: string
   /** Id of the part type, "" for none. */
   partTypeId: string
+  /** Only for cars of at least this age (years) or this mileage (km). Blank: no condition. */
+  minAge: string
+  minKm: string
   measurements: DraftMeasurement[]
 }
 
@@ -42,7 +45,14 @@ export const newMeasurement = (): DraftMeasurement => ({
   orMore: '',
 })
 
-export const newPoint = (): DraftPoint => ({ key: nextKey(), label: '', partTypeId: '', measurements: [] })
+export const newPoint = (): DraftPoint => ({
+  key: nextKey(),
+  label: '',
+  partTypeId: '',
+  minAge: '',
+  minKm: '',
+  measurements: [],
+})
 
 export const newBlock = (): DraftBlock => ({ key: nextKey(), name: '', points: [newPoint()] })
 
@@ -58,6 +68,8 @@ export function draftFromContent(content: ChecklistContent): Draft {
         key: nextKey(),
         label: point.label,
         partTypeId: point.part_type_id ?? '',
+        minAge: point.min_age_years === null ? '' : String(point.min_age_years),
+        minKm: point.min_odometer_km === null ? '' : String(point.min_odometer_km),
         measurements: point.measurements.map((measurement) => ({
           key: nextKey(),
           label: measurement.label,
@@ -72,12 +84,26 @@ export function draftFromContent(content: ChecklistContent): Draft {
   }
 }
 
-/** Blank is no limit. Anything else must be a number from 0 to 9999, otherwise NaN. */
+/** Blank is no limit. Anything else must be a number from -9999 to 9999, otherwise NaN. */
 function parseLimit(text: string): number | null {
   if (text.trim() === '') return null
   const value = Number(text.trim().replace(',', '.'))
-  return Number.isFinite(value) && value >= 0 && value <= 9999 ? value : Number.NaN
+  return Number.isFinite(value) && value >= -9999 && value <= 9999 ? value : Number.NaN
 }
+
+/**
+ * Blank is no condition. Anything else must be a whole number from 1 to `max`, otherwise NaN.
+ * Spaces and dots between the thousands are allowed: "150.000".
+ */
+function parseWhole(text: string, max: number): number | null {
+  const digits = text.replace(/[\s.]/g, '')
+  if (digits === '') return null
+  const value = Number(digits)
+  return Number.isInteger(value) && value >= 1 && value <= max ? value : Number.NaN
+}
+
+export const MAX_AGE_YEARS = 100
+export const MAX_KM = 2_000_000
 
 /** "Of meer" only makes sense when a lower value is worse; otherwise it is ignored. */
 const orMoreOf = (m: DraftMeasurement) => (m.direction === 'lower_is_worse' ? parseLimit(m.orMore) : null)
@@ -96,6 +122,12 @@ export function validate(draft: Draft): string | null {
       if (!between(point.label, 80)) return `${where}: geef elk punt een naam van maximaal 80 tekens.`
       const pointWhere = `Punt "${point.label.trim()}"`
       if (point.measurements.length > 10) return `${pointWhere} heeft maximaal 10 metingen.`
+      if (Number.isNaN(parseWhole(point.minAge, MAX_AGE_YEARS))) {
+        return `${pointWhere}: de leeftijd is een heel aantal jaren, van 1 tot ${MAX_AGE_YEARS}.`
+      }
+      if (Number.isNaN(parseWhole(point.minKm, MAX_KM))) {
+        return `${pointWhere}: de kilometerstand is een heel getal, van 1 tot 2 miljoen.`
+      }
       for (const m of point.measurements) {
         if (!between(m.label, 20)) return `${pointWhere}: geef elke meting een naam van maximaal 20 tekens.`
         if (!between(m.unit, 10)) return `${pointWhere}: geef elke meting een eenheid van maximaal 10 tekens.`
@@ -103,10 +135,10 @@ export function validate(draft: Draft): string | null {
         const fault = parseLimit(m.fault)
         const orMore = orMoreOf(m)
         if (Number.isNaN(advice) || Number.isNaN(fault) || Number.isNaN(orMore)) {
-          return `${pointWhere}, meting ${m.label.trim()}: een grens is een getal van 0 tot 9999.`
+          return `${pointWhere}, meting ${m.label.trim()}: een grens is een getal van -9999 tot 9999.`
         }
-        if (orMore !== null && (advice === null || orMore < advice)) {
-          return `${pointWhere}, meting ${m.label.trim()}: 'of meer' begint bij de adviesgrens of hoger.`
+        if (orMore !== null && (advice === null || orMore < advice || orMore < 0)) {
+          return `${pointWhere}, meting ${m.label.trim()}: 'of meer' begint bij de adviesgrens of hoger, en bij 0 of hoger.`
         }
         if (advice !== null && fault !== null) {
           const wrongWay = m.direction === 'lower_is_worse' ? fault > advice : fault < advice
@@ -126,6 +158,8 @@ export function toPayload(draft: Draft, partTypes: PartType[]): ChecklistPayload
     points: block.points.map((point) => ({
       label: point.label.trim(),
       part_type: names.get(point.partTypeId) ?? null,
+      min_age_years: parseWhole(point.minAge, MAX_AGE_YEARS),
+      min_odometer_km: parseWhole(point.minKm, MAX_KM),
       measurements: point.measurements.map((m) => ({
         label: m.label.trim(),
         unit: m.unit.trim(),

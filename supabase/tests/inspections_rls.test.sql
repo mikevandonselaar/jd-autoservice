@@ -2,7 +2,7 @@
 -- and `supabase test db` can run it. Everything happens in one rolled-back transaction.
 begin;
 
-select plan(72);
+select plan(84);
 
 -- Fixtures. Fixed ids start with c0000000, so they cannot clash with the dev seed.
 --   ...0a admin   ...01 employee   ...02 employee   ...03 workshop   ...04 employee, ended yesterday
@@ -66,8 +66,8 @@ select is(
    join public.checklist_blocks b on b.id = p.block_id
    join public.checklists c on c.id = b.checklist_id
    where c.name = 'Grote beurt'),
-  41::bigint,
-  'the migration created the Grote beurt checklist with 41 points'
+  44::bigint,
+  'Grote beurt has 44 points'
 );
 
 select is(
@@ -76,8 +76,26 @@ select is(
    join public.checklist_blocks b on b.id = p.block_id
    join public.checklists c on c.id = b.checklist_id
    where c.name = 'Grote beurt'),
-  9::bigint,
-  'Grote beurt has 9 measurements'
+  10::bigint,
+  'Grote beurt has 10 measurements'
+);
+
+select is(
+  (select string_agg(p.label, ', ' order by p.sort) from public.checklist_points p
+   join public.checklist_blocks b on b.id = p.block_id
+   join public.checklists c on c.id = b.checklist_id
+   where c.name = 'Grote beurt' and b.name = 'Wielen en remmen' and p.sort <= 4),
+  'Remblokken voor, Remschijven voor, Remblokken achter, Remschijven achter',
+  'brake pads and brake discs are separate points'
+);
+
+select is(
+  (select coalesce(p.min_age_years::text, '-') from public.checklist_points p
+   join public.checklist_blocks b on b.id = p.block_id
+   join public.checklists c on c.id = b.checklist_id
+   where c.name = 'Kleine beurt' and p.label = 'Koelvloeistof'),
+  '10',
+  'Kleine beurt measures the coolant from 10 years'
 );
 
 select set_config('test.checklist', (select id::text from public.checklists where name = 'Grote beurt'), true);
@@ -149,21 +167,21 @@ select is(
 select is(
   (select count(*) filter (where status = 'open') from public.inspection_items
    where inspection_id = pg_temp.saved('insp')),
-  41::bigint,
-  'the inspection copied all 41 points, all open'
+  44::bigint,
+  'without a build year the inspection copied all 44 points, all open'
 );
 
 select is(
   (select count(*) from public.inspection_readings r
    join public.inspection_items i on i.id = r.item_id
    where i.inspection_id = pg_temp.saved('insp')),
-  9::bigint,
-  'the inspection copied the 9 measurements'
+  10::bigint,
+  'the inspection copied the 10 measurements'
 );
 
 select is(
   (select reason_options[1] from public.inspection_items
-   where inspection_id = pg_temp.saved('insp') and label = 'Remmen voor'),
+   where inspection_id = pg_temp.saved('insp') and label = 'Remblokken voor'),
   'Versleten',
   'a point copied the reasons of its part type'
 );
@@ -298,6 +316,21 @@ select is(
   (select value || ' ' || or_more from public.inspection_readings where id = pg_temp.saved('tyre')),
   '4.50 false',
   'an exact value clears the "or more" flag'
+);
+
+select set_config('test.coolant', (select r.id::text from public.inspection_readings r
+  join public.inspection_items i on i.id = r.item_id
+  where i.inspection_id = pg_temp.saved('insp') and i.label = 'Koelvloeistof'), true);
+
+select lives_ok(
+  $$ select public.set_reading(pg_temp.saved('coolant'), -20) $$,
+  'employee saves a freezing point below zero'
+);
+
+select is(
+  (select value from public.inspection_readings where id = pg_temp.saved('coolant')),
+  -20.00::numeric,
+  'the value below zero is stored'
 );
 
 select throws_ok(
@@ -439,6 +472,69 @@ select is(
   'blocks and points keep the order of the arrays'
 );
 
+select ok(
+  set_config('test.aged', public.admin_save_checklist(null, 'Leeftijdslijst', $json$
+    [{"name": "A", "points": [{"label": "Altijd"},
+      {"label": "Oud", "min_age_years": 10},
+      {"label": "Veel km", "min_odometer_km": 150000},
+      {"label": "Oud of veel km", "min_age_years": 8, "min_odometer_km": 200000}]}]
+  $json$)::text, true) is not null,
+  'admin creates a checklist with points for older cars'
+);
+
+select set_config('test.this_year', extract(year from now() at time zone 'Europe/Amsterdam')::text, true);
+
+select set_config('test.young', public.start_inspection(
+  pg_temp.saved('aged'), 'ZZ-01-AA', 50000, current_setting('test.this_year')::integer - 3)::text, true);
+select set_config('test.old', public.start_inspection(
+  pg_temp.saved('aged'), 'ZZ-02-AA', 50000, current_setting('test.this_year')::integer - 12)::text, true);
+select set_config('test.far', public.start_inspection(
+  pg_temp.saved('aged'), 'ZZ-03-AA', 160000, current_setting('test.this_year')::integer - 3)::text, true);
+
+select is(
+  (select string_agg(label, ', ' order by sort) from public.inspection_items where inspection_id = pg_temp.saved('young')),
+  'Altijd',
+  'a young car with a low mileage only gets the points for every car'
+);
+
+select is(
+  (select string_agg(label, ', ' order by sort) from public.inspection_items where inspection_id = pg_temp.saved('old')),
+  'Altijd, Oud, Oud of veel km',
+  'an old car also gets the points from its age'
+);
+
+select is(
+  (select string_agg(label, ', ' order by sort) from public.inspection_items where inspection_id = pg_temp.saved('far')),
+  'Altijd, Veel km',
+  'a high mileage also gets the points from that mileage'
+);
+
+select is(
+  (select min_age_years || '/' || min_odometer_km || ' ' || i.build_year
+   from public.inspection_items t join public.inspections i on i.id = t.inspection_id
+   where t.inspection_id = pg_temp.saved('old') and t.label = 'Oud of veel km'),
+  '8/200000 ' || (current_setting('test.this_year')::integer - 12),
+  'the inspection keeps the build year, and its points the age and mileage they apply from'
+);
+
+select throws_ok(
+  $$ select public.start_inspection(pg_temp.saved('aged'), 'ZZ-04-AA', 1000, 1800) $$,
+  '22023', null,
+  'start rejects a build year before 1900'
+);
+
+select throws_ok(
+  $$ select public.admin_save_checklist(null, 'Fout', '[{"name": "A", "points": [{"label": "B", "min_age_years": 0}]}]') $$,
+  '22023', null,
+  'a minimum age of 0 years is rejected'
+);
+
+select throws_ok(
+  $$ select public.admin_save_checklist(null, 'Fout', '[{"name": "A", "points": [{"label": "B", "min_odometer_km": 1.5}]}]') $$,
+  '22023', null,
+  'a minimum mileage that is not a whole number is rejected'
+);
+
 select throws_ok(
   $$ select public.admin_save_checklist(null, 'Leeg', '[]') $$,
   '22023', null,
@@ -531,8 +627,8 @@ select lives_ok(
 
 select is(
   (select count(*) from public.inspection_items where inspection_id = pg_temp.saved('insp')),
-  41::bigint,
-  'a completed inspection keeps its own 41 points after the checklist changed'
+  44::bigint,
+  'a completed inspection keeps its own 44 points after the checklist changed'
 );
 
 select lives_ok(

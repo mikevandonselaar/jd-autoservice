@@ -5,6 +5,9 @@ import { TextField } from '../../components/TextField'
 import type { Direction, PartType } from '../../inspection/types'
 import { move, newMeasurement, type DraftMeasurement, type DraftPoint } from './checklistDraft'
 
+/** Digits only, at most `length`, for the age and mileage of a point. */
+const digits = (text: string, length: number) => text.replace(/\D/g, '').slice(0, length)
+
 export function IconButton({
   label,
   icon,
@@ -59,7 +62,14 @@ export function PointEditor({
 }: PointEditorProps) {
   const partType = partTypes.find((type) => type.id === point.partTypeId)
   const count = point.measurements.length
-  const summary = [partType?.name, count > 0 && `${count} ${count === 1 ? 'meting' : 'metingen'}`]
+  const from = [point.minAge.trim() && `${point.minAge.trim()} jaar`, point.minKm.trim() && `${point.minKm.trim()} km`]
+    .filter(Boolean)
+    .join(' of ')
+  const summary = [
+    partType?.name,
+    count > 0 && `${count} ${count === 1 ? 'meting' : 'metingen'}`,
+    from && `vanaf ${from}`,
+  ]
     .filter(Boolean)
     .join(' · ')
 
@@ -112,6 +122,29 @@ export function PointEditor({
             ))}
           </SelectField>
 
+          <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-2 gap-2.5">
+              <TextField
+                id={`${point.key}-min-age`}
+                label="Alleen vanaf (jaar)"
+                inputMode="numeric"
+                value={point.minAge}
+                onChange={(event) => onChange({ ...point, minAge: digits(event.target.value, 3) })}
+              />
+              <TextField
+                id={`${point.key}-min-km`}
+                label="Of vanaf (km)"
+                inputMode="numeric"
+                value={point.minKm}
+                onChange={(event) => onChange({ ...point, minKm: digits(event.target.value, 7) })}
+              />
+            </div>
+            <span className="text-base text-muted">
+              Leeg laten voor elke auto. Anders komt het punt alleen bij een auto van die leeftijd of met die
+              kilometerstand, bijvoorbeeld koelvloeistof vanaf 10 jaar.
+            </span>
+          </div>
+
           {point.measurements.map((measurement, index) => (
             <div key={measurement.key} className="flex flex-col gap-2.5 rounded-sm bg-canvas p-3">
               <div className="flex items-center">
@@ -153,7 +186,7 @@ export function PointEditor({
                 onChange={(event) => changeMeasurement(index, { direction: event.target.value as Direction })}
               >
                 <option value="lower_is_worse">lager wordt (profiel, voering, accu)</option>
-                <option value="higher_is_worse">hoger wordt (vocht in remvloeistof)</option>
+                <option value="higher_is_worse">hoger wordt (vocht in remvloeistof, vriespunt)</option>
               </SelectField>
               <div className="grid grid-cols-2 gap-2.5">
                 <TextField

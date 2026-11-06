@@ -23,6 +23,7 @@ Migratie `20261106130000_inspections.sql`, tests in `inspections_rls.test.sql`. 
 - RPC's voor de eigenaar: `admin_save_part_type`, `admin_delete_part_type`, `admin_save_checklist`, `admin_delete_checklist`
 - Startgegevens: 14 types onderdelen en de checklist "Grote beurt" (41 punten, 9 metingen)
 - Migratie `20261106150000_or_more_readings.sql`: `or_more_value` bij een meting en `or_more` bij een waarde, `set_reading(id, waarde, of_meer)`, en de banden van de startchecklists op 5 mm.
+- Migratie `20261106170000_coolant_conditions_brakes.sql` (feedback werkplaats): waarden onder nul, `min_age_years` en `min_odometer_km` bij een punt, `build_year` bij een inspectie, `start_inspection(checklist, kenteken, km, bouwjaar)`. Remmen voor/achter gesplitst in remblokken (met voering) en remschijven, met de nieuwe types Remblokken, Remschijven en Koelsysteem. Koelvloeistof (vriespunt) in Grote beurt voor elke auto, in Kleine beurt vanaf 10 jaar.
 
 ### 2. Gedeelde componenten ✅
 
@@ -49,10 +50,13 @@ Keuzes onderweg:
 - "Nu · klant bellen" is een fout. "Nu gerepareerd" wordt gerepareerd, de twee andere keuzes worden advies met een termijn.
 - Goed of Fout op een punt zonder meting is één tik. Fout klapt het paneel open; zolang je geen uitkomst kiest blijft het punt open en wordt de reden alleen in het paneel bewaard.
 - **Het systeem doet een voorstel** zodra alle posities van een punt een waarde hebben: binnen de grenzen wordt het punt Goed, voorbij de foutgrens "Nu · klant bellen" (paneel open), voorbij de adviesgrens blijft het punt open met "Advies · kies de termijn". De termijn kiest de monteur altijd zelf. Het label "voorstel" blijft staan tot de monteur iets aanpast, en verdwijnt bij herladen.
-- Een punt met een meting kan alleen via Meten (eerst meten, dan Goed of Fout). De waarden staan onder de naam; een tik erop meet opnieuw. Een nieuwe meting zet het resultaat alleen opnieuw als het punt nog open staat of nog een voorstel is; een keuze van de monteur blijft staan.
+- Goed kan bij een punt met een meting pas na het meten; Fout kan altijd (zie hieronder). De waarden staan onder de naam; een tik erop meet opnieuw. Een nieuwe meting zet het resultaat alleen opnieuw als het punt nog open staat of nog een voorstel is; een keuze van de monteur blijft staan.
 - Een meting sluiten of van positie wisselen bewaart wat al is ingetikt (elke tik wordt direct opgeslagen). Sluit je het paneel nadat alle posities een waarde hebben, dan geldt het voorstel.
 - **"5 of meer" voor banden.** Een meting kan een snelwaarde "of meer" hebben (`or_more_value`, instelbaar in het beheer, bij de banden 5 mm). In het meetpaneel staat die als brede knop, en "Alle banden 5 mm of meer" vult in één tik alle lege posities (na één band heet die "Overige banden"). De waarde wordt opgeslagen als 5 met de vlag `or_more`; in de schermen staat "≥ 5". Alleen voor metingen waar lager slechter is.
 - Het startscherm toont "Lopende inspecties" van jezelf, om een concept op een ander apparaat te hervatten. In M2 sluit "Sluiten, later verder" af zonder weg te gooien.
+- **Fout zonder meten.** Een punt met een meting heeft **Meten** en **Fout** naast elkaar: een kapotte band is een fout, ook met genoeg profiel. Na een fout zonder meting staat "Niet gemeten" onder de naam; een tik erop meet alsnog.
+- **Extra punten voor oudere auto's.** Een punt kan "alleen vanaf" een leeftijd in jaren en/of een km-stand hebben (in het beheer). Bij de start vult de monteur het bouwjaar in (overgenomen van het vorige bezoek). Het punt komt mee als de auto aan één van de twee voldoet, en staat in de checklist als "Extra · vanaf 10 jaar". Zonder bouwjaar komen alle extra punten mee.
+- **Waarden onder nul**, voor het vriespunt van koelvloeistof. Liggen de grenzen onder nul, dan telt een getypte waarde ook als onder nul; het toetsenbord heeft geen minteken.
 - De tellers in M5 heten "Gerepareerd", niet "Hersteld", om verwarring met de Herstel-knop te voorkomen.
 - Alleen de rollen `admin` en `employee` komen op de routes onder `/inspectie`. Dat verbergt alleen schermen; RLS en de RPC's beslissen.
 
@@ -71,6 +75,10 @@ Hier is geen ontwerp voor. Gebouwd in dezelfde stijl: één kolom, dezelfde comp
 - [ ] Verwachte punten laten meetellen in de planning (de planningsschermen zijn nog niet ontworpen)
 
 ## Open punten
+
+- De grenzen voor koelvloeistof (advies boven -25 °C, fout boven -15 °C) zijn een eerste voorstel. De eigenaar loopt ze na.
+- Remschijven hebben geen meting: de minimale dikte verschilt per auto. Het is Goed of Fout, met de reden "Onder minimale dikte".
+- Het bouwjaar wordt nu ingetypt. Het kan ook automatisch uit de open data van de RDW komen (gratis, zonder sleutel), maar dat is een extra externe dienst.
 
 - Eindcontrole bestaat uit handelingen (servicereset, wielmoeren, Forte brandstofadditief). Moet er een apart type **Handeling** komen, met redenen als "Niet gedaan" en "Klant wil niet"?
 - De checklists "Kleine beurt" (23 punten, 7 metingen) en "APK" (31 punten, 7 metingen) staan als startgegevens in `20261106140000_more_checklists.sql`. De punten zijn een eerste opzet uit algemene kennis, niet de officiële RDW-lijst. De eigenaar loopt ze na in het beheer.

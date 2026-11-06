@@ -20,13 +20,14 @@ function unwrap<T>({ data, error }: { data: unknown; error: PostgrestError | nul
 
 const ITEM_COLUMNS =
   'id, inspection_id, block_name, block_sort, label, sort, reason_options, status, term, reason, ' +
+  'min_age_years, min_odometer_km, ' +
   'readings:inspection_readings(id, item_id, label, unit, direction, advice_limit, fault_limit, or_more_value, sort, value, or_more), ' +
   'photos:inspection_photos(id, path, created_at)'
 
 const byCreated = (a: Photo, b: Photo) => a.created_at.localeCompare(b.created_at)
 
 const INSPECTION_COLUMNS =
-  'id, plate, plate_key, odometer_km, checklist_name, mechanic_id, status, note, started_at, completed_at'
+  'id, plate, plate_key, odometer_km, build_year, checklist_name, mechanic_id, status, note, started_at, completed_at'
 
 async function fetchItems(inspectionId: string): Promise<InspectionItem[]> {
   const items = unwrap<InspectionItem[]>(
@@ -45,7 +46,7 @@ export const plateKeyOf = (plate: string) => plate.replace(/-/g, '')
 export async function fetchPreviousVisit(plateKey: string, before: string | null): Promise<PreviousVisit | null> {
   let query = supabase
     .from('inspections')
-    .select('id, odometer_km, completed_at')
+    .select('id, odometer_km, build_year, completed_at')
     .eq('plate_key', plateKey)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
@@ -126,12 +127,18 @@ export async function fetchCompleted(days: number): Promise<CompletedInspection[
   return rows.map(({ inspection_items, ...inspection }) => ({ ...inspection, findings: findings(inspection_items) }))
 }
 
-export async function startInspection(checklistId: string, plate: string, odometerKm: number): Promise<string> {
+export async function startInspection(
+  checklistId: string,
+  plate: string,
+  odometerKm: number,
+  buildYear: number,
+): Promise<string> {
   return unwrap(
     await supabase.rpc('start_inspection', {
       p_checklist_id: checklistId,
       p_plate: plate,
       p_odometer_km: odometerKm,
+      p_build_year: buildYear,
     }),
   )
 }
@@ -188,6 +195,8 @@ export type ChecklistContent = {
       label: string
       sort: number
       part_type_id: string | null
+      min_age_years: number | null
+      min_odometer_km: number | null
       measurements: {
         label: string
         unit: string
@@ -207,7 +216,7 @@ export async function fetchChecklistContent(id: string): Promise<ChecklistConten
     await supabase
       .from('checklists')
       .select(
-        'id, name, blocks:checklist_blocks(name, sort, points:checklist_points(label, sort, part_type_id, ' +
+        'id, name, blocks:checklist_blocks(name, sort, points:checklist_points(label, sort, part_type_id, min_age_years, min_odometer_km, ' +
           'measurements:checklist_measurements(label, unit, direction, advice_limit, fault_limit, or_more_value, sort)))',
       )
       .eq('id', id)
@@ -228,6 +237,8 @@ export type ChecklistPayload = {
   points: {
     label: string
     part_type: string | null
+    min_age_years: number | null
+    min_odometer_km: number | null
     measurements: {
       label: string
       unit: string

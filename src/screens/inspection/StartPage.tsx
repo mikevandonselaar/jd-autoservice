@@ -18,13 +18,17 @@ import { useLoad } from '../../lib/useLoad'
 // Same pattern as the database: letters and digits, with dashes between groups.
 const PLATE = /^[A-Z0-9]+(-[A-Z0-9]+)*$/
 const MAX_KM = 2_000_000
+const MIN_YEAR = 1900
+const MAX_YEAR = new Date().getFullYear() + 1
 
-/** M1: licence plate, mileage and the checklist to use. */
+/** M1: licence plate, mileage, build year and the checklist to use. */
 export function StartPage() {
   const navigate = useNavigate()
   const checklists = useLoad(fetchChecklists)
   const [plateText, setPlateText] = useState('')
   const [kmText, setKmText] = useState('')
+  // Null until typed in: then the build year of the previous visit counts.
+  const [yearText, setYearText] = useState<string | null>(null)
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [found, setFound] = useState<{ key: string; visit: PreviousVisit | null } | null>(null)
   const [starting, setStarting] = useState(false)
@@ -57,17 +61,21 @@ export function StartPage() {
   const previous = plateValid && found?.key === plateKey ? found.visit : null
   const earlierAdvice = (previous?.items ?? []).filter((item) => item.status === 'advice')
 
+  const shownYear = yearText ?? (previous?.build_year != null ? String(previous.build_year) : '')
+  const year = shownYear.length === 4 ? Number(shownYear) : null
+  const yearValid = year !== null && year >= MIN_YEAR && year <= MAX_YEAR
+
   const list = checklists.state.status === 'ready' ? checklists.state.data : []
   // With one checklist there is nothing to choose.
   const checklistId = pickedId ?? (list.length === 1 ? list[0].id : null)
-  const canStart = plateValid && km !== null && km <= MAX_KM && checklistId !== null && !starting
+  const canStart = plateValid && km !== null && km <= MAX_KM && yearValid && checklistId !== null && !starting
 
   async function start() {
     if (!canStart) return
     setStarting(true)
     setFailed(false)
     try {
-      const id = await startInspection(checklistId, plate, km)
+      const id = await startInspection(checklistId, plate, km, year)
       navigate(`/inspectie/${id}`, { replace: true })
     } catch {
       setFailed(true)
@@ -118,6 +126,29 @@ export function StartPage() {
         <Notice tone="advice">Lager dan de vorige keer ({formatKm(previous.odometer_km)} km). Klopt dit?</Notice>
       )}
       {km !== null && km > MAX_KM && <Notice tone="fault">Een kilometerstand boven de 2 miljoen kan niet.</Notice>}
+
+      <div className="grid grid-cols-[150px_1fr] items-end gap-2.5">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="year" className="text-base font-semibold">
+            Bouwjaar
+          </label>
+          <input
+            id="year"
+            inputMode="numeric"
+            autoComplete="off"
+            value={shownYear}
+            onChange={(event) => setYearText(event.target.value.replace(/\D/g, '').slice(0, 4))}
+            className="h-14 w-full min-w-0 rounded-sm border-[3px] border-charcoal bg-surface px-3 text-2xl font-bold text-ink focus:outline-none"
+          />
+        </div>
+        <span className="pb-1 text-muted">Voor de extra punten bij oudere auto's.</span>
+      </div>
+
+      {year !== null && !yearValid && (
+        <Notice tone="fault">
+          Een bouwjaar tussen {MIN_YEAR} en {MAX_YEAR} kan alleen.
+        </Notice>
+      )}
 
       <div className="flex flex-col gap-2">
         <SectionLabel>Checklist</SectionLabel>

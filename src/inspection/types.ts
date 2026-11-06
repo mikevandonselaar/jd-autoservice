@@ -37,6 +37,9 @@ export type InspectionItem = {
   status: ItemStatus
   term: AdviceTerm | null
   reason: string | null
+  /** An extra point for older cars: it came along from this age or this mileage. Both null: every car. */
+  min_age_years: number | null
+  min_odometer_km: number | null
   readings: Reading[]
   /** Oldest first. */
   photos: Photo[]
@@ -47,6 +50,8 @@ export type Inspection = {
   plate: string
   plate_key: string
   odometer_km: number
+  /** Null for inspections from before the build year was asked. */
+  build_year: number | null
   checklist_name: string
   mechanic_id: string
   status: 'draft' | 'completed'
@@ -59,6 +64,7 @@ export type Inspection = {
 export type PreviousVisit = {
   id: string
   odometer_km: number
+  build_year: number | null
   completed_at: string
   items: InspectionItem[]
 }

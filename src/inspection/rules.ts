@@ -1,4 +1,4 @@
-import { formatNumber } from '../lib/format'
+import { formatKm, formatNumber } from '../lib/format'
 import type { AdviceTerm, InspectionItem, ItemStatus, PreviousVisit, Reading } from './types'
 
 const NBSP = ' '
@@ -67,6 +67,14 @@ export function limitText(reading: Reading, limit: number): string {
   return `${reading.direction === 'lower_is_worse' ? 'onder' : 'boven'} ${formatNumber(limit)}`
 }
 
+/**
+ * A measurement below zero, like the freezing point of coolant: its limits are below zero, so the
+ * typed digits count as a value below zero.
+ */
+export function belowZero(reading: Pick<Reading, 'advice_limit' | 'fault_limit'>): boolean {
+  return (reading.advice_limit ?? reading.fault_limit ?? 0) < 0
+}
+
 const STEPS = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10]
 
 /** The largest round step that is not more than `target`. */
@@ -82,7 +90,8 @@ export type QuickValue = { value: number; orMore: boolean }
  * Ready-made values to tap instead of typing, best first: the good side, then fine steps from
  * the advice limit to just past the fault limit. Made from the limits, so brake lining gives
  * 7 6 5 4 3 2,5 … 0,5. With an "or more" value the good side is that one key and the fine steps
- * below it: tyres give "5 of meer" 4,5 4 3,5 … 1. Empty without limits.
+ * below it: tyres give "5 of meer" 4,5 4 3,5 … 1. Values stay at 0 or above, unless the limits
+ * are below zero: coolant gives -41 -37 -33 -29 -25 -23 … -11. Empty without limits.
  */
 export function quickValues(reading: Reading): QuickValue[] {
   const advice = reading.advice_limit ?? reading.fault_limit
@@ -91,13 +100,14 @@ export function quickValues(reading: Reading): QuickValue[] {
 
   // +1 when a higher value is worse.
   const worse = reading.direction === 'lower_is_worse' ? -1 : 1
-  const fine = niceStep((Math.abs(advice - fault) || advice * 0.25 || 1) / 3)
+  const fine = niceStep((Math.abs(advice - fault) || Math.abs(advice) * 0.25 || 1) / 3)
+  const lowest = belowZero(reading) ? -Infinity : 0
 
   const bad: QuickValue[] = []
   let pastFault = 0
   for (let step = 0; step < 8; step += 1) {
     const value = round(advice + worse * step * fine)
-    if (value < 0) break
+    if (value < lowest) break
     bad.push({ value, orMore: false })
     if (beyond(reading, value, fault)) pastFault += 1
     if (pastFault === 2) break
@@ -114,7 +124,7 @@ export function quickValues(reading: Reading): QuickValue[] {
   } else {
     for (let step = 1; step <= 4; step += 1) {
       const value = round(advice - worse * step * fine * 2)
-      if (value < 0) break
+      if (value < lowest) break
       good.unshift({ value, orMore: false })
     }
   }
@@ -126,6 +136,16 @@ export function parseValue(text: string): number | null {
   if (text === '') return null
   const value = Number(text.replace(',', '.'))
   return Number.isFinite(value) ? value : null
+}
+
+// Extra points for older cars -----------------------------------------------
+
+/** "vanaf 10 jaar", "vanaf 150 000 km" or "vanaf 10 jaar of 150 000 km". Null for every car. */
+export function appliesFromText(minAgeYears: number | null, minOdometerKm: number | null): string | null {
+  const parts = []
+  if (minAgeYears !== null) parts.push(`${minAgeYears} jaar`)
+  if (minOdometerKm !== null) parts.push(`${formatKm(minOdometerKm)} km`)
+  return parts.length === 0 ? null : `vanaf ${parts.join(' of ')}`
 }
 
 // Counting -------------------------------------------------------------------

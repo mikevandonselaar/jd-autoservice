@@ -171,7 +171,7 @@ export function ChecklistPage() {
       )}
 
       <div className="flex items-center gap-2.5">
-        <span className="flex-1 text-muted">Goed of Fout per punt. Bij een meting eerst Meten.</span>
+        <span className="flex-1 text-muted">Goed of Fout per punt. Bij een meting eerst Meten, of meteen Fout.</span>
         <button
           type="button"
           aria-pressed={onlyOpen}

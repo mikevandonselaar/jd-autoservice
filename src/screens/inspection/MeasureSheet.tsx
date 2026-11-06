@@ -5,6 +5,7 @@ import { Icon } from '../../components/icons'
 import { NumericKeypad, type KeypadKey } from '../../components/NumericKeypad'
 import { useInspection } from '../../inspection/InspectionContext'
 import {
+  belowZero,
   formatReading,
   limitText,
   parseValue,
@@ -90,6 +91,8 @@ export function MeasureSheet({ item, readingId, onClose, onFinish }: MeasureShee
   const multiple = readings.length > 1
   const previous = previousReading(previousByPoint, item, current)
   const quick = quickValues(current)
+  // The keypad has no minus key: for coolant the typed digits are below zero.
+  const sign = belowZero(current) ? -1 : 1
   const emptyWithOrMore = readings.filter((reading) => reading.value === null && reading.or_more_value !== null)
 
   function snapshot(): Reading[] {
@@ -129,7 +132,7 @@ export function MeasureSheet({ item, readingId, onClose, onFinish }: MeasureShee
   }
 
   function startTyping() {
-    setTyped(current.value !== null && !current.or_more ? formatNumber(current.value) : '')
+    setTyped(current.value !== null && !current.or_more ? formatNumber(Math.abs(current.value)) : '')
     setTouched(false)
     setTyping(true)
   }
@@ -137,7 +140,8 @@ export function MeasureSheet({ item, readingId, onClose, onFinish }: MeasureShee
   /** Saves what was typed, when it was touched. */
   function commitTyped() {
     if (!typing || !touched) return
-    const value = parseValue(typed)
+    const typedValue = parseValue(typed)
+    const value = typedValue === null ? null : sign * typedValue
     if (value !== current.value || current.or_more) save(current, value, false)
   }
 
@@ -232,7 +236,7 @@ export function MeasureSheet({ item, readingId, onClose, onFinish }: MeasureShee
             aria-live="polite"
             className="flex h-14 flex-none items-baseline justify-end gap-2 rounded-sm border-[3px] border-charcoal px-4 text-2xl font-bold"
           >
-            <span className="flex h-full items-center">{typed === '' ? <span className="text-muted">–</span> : typed}</span>
+            <span className="flex h-full items-center">{typed === '' ? <span className="text-muted">–</span> : `${sign < 0 ? '-' : ''}${typed}`}</span>
             <span className="self-center text-lg font-semibold text-muted">{current.unit}</span>
           </div>
           <NumericKeypad

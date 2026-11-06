@@ -1,5 +1,12 @@
 import { Icon, type IconName } from '../../components/icons'
-import { decisionText, isMeasured, readingsSummary, readingState, suggestedStatus } from '../../inspection/rules'
+import {
+  appliesFromText,
+  decisionText,
+  isMeasured,
+  readingsSummary,
+  readingState,
+  suggestedStatus,
+} from '../../inspection/rules'
 import type { InspectionItem } from '../../inspection/types'
 import { FaultPanel } from './FaultPanel'
 
@@ -16,12 +23,13 @@ type ChoiceButtonProps = {
   icon: IconName
   label: string
   look: keyof typeof choiceLooks
-  pressed: boolean
+  /** Absent for Meten, which is an action, not a choice. */
+  pressed?: boolean
   expanded?: boolean
   onClick: () => void
 }
 
-/** Goed or Fout: a button with the icon above its word, the same size in every row. */
+/** Goed, Fout or Meten: a button with the icon above its word, the same size in every row. */
 function ChoiceButton({ icon, label, look, pressed, expanded, onClick }: ChoiceButtonProps) {
   return (
     <button
@@ -56,8 +64,9 @@ type ChecklistRowProps = {
 }
 
 /**
- * One point of the checklist. Not measured yet: a Meten button. Otherwise Goed and Fout, with
- * the measured values under the name; a tap on them measures again. Fout opens the reason panel.
+ * One point of the checklist. Not measured yet: Meten and Fout, because a fault can be plain to see
+ * without measuring (a damaged tyre). Otherwise Goed and Fout, with the measured values under the
+ * name; a tap on them measures again. Fout opens the reason panel.
  */
 export function ChecklistRow({
   item,
@@ -72,8 +81,11 @@ export function ChecklistRow({
 }: ChecklistRowProps) {
   const measured = isMeasured(item)
   const needsMeasure = item.status === 'open' && item.readings.length > 0 && !measured
+  // Measured, or decided without measuring: a tap on the text (re)measures.
+  const canRemeasure = item.readings.length > 0 && !needsMeasure
   const measuredCount = item.readings.filter((reading) => reading.value !== null).length
-  const summary = readingsSummary(item)
+  const summary = readingsSummary(item) || (canRemeasure ? 'Niet gemeten' : '')
+  const appliesFrom = appliesFromText(item.min_age_years, item.min_odometer_km)
   // Measured values that point to an advice, while the term is still to be chosen.
   const adviceHint =
     item.status === 'open' && suggestedStatus(item.readings.map((reading) => readingState(reading))) === 'advice'
@@ -90,7 +102,7 @@ export function ChecklistRow({
           : 'text-muted'
 
   let status = decisionText(item)
-  if (needsMeasure) status = measuredCount === 0 ? 'Eerst meten' : ''
+  if (needsMeasure) status = measuredCount === 0 ? 'Nog niet gemeten' : `${measuredCount} van ${item.readings.length} gemeten`
   else if (adviceHint) status = 'Advies · kies de termijn'
   else if (item.reason) status = `${status} · ${item.reason}`
 
@@ -118,10 +130,11 @@ export function ChecklistRow({
   const text = (
     <>
       <b className="block leading-tight font-bold break-words hyphens-auto">{item.label}</b>
+      {appliesFrom && <span className="block text-muted">Extra · {appliesFrom}</span>}
       {summary && (
-        <span className={`block font-bold ${measured ? 'underline decoration-edge-open underline-offset-4' : 'text-muted'}`}>
+        <span className={`block font-bold ${canRemeasure ? 'underline decoration-edge-open underline-offset-4' : 'text-muted'}`}>
           {summary}
-          {measured && <Icon name="pencil" className="ml-1.5 inline size-4 align-text-bottom" strokeWidth={2.4} />}
+          {canRemeasure && <Icon name="pencil" className="ml-1.5 inline size-4 align-text-bottom" strokeWidth={2.4} />}
         </span>
       )}
       {(status || suggested) && (
@@ -141,7 +154,7 @@ export function ChecklistRow({
   return (
     <div id={`item-${item.id}`} className={`border-t border-divider px-3.5 py-2 ${tint}`}>
       <div className="flex min-h-14 items-center gap-2">
-        {measured ? (
+        {canRemeasure ? (
           <button
             type="button"
             onClick={() => onMeasure(item.readings[0].id)}
@@ -155,41 +168,32 @@ export function ChecklistRow({
         )}
 
         {needsMeasure ? (
-          <button
-            type="button"
+          <ChoiceButton
+            icon="ruler"
+            label="Meten"
+            look="open"
             onClick={() => onMeasure((item.readings.find((reading) => reading.value === null) ?? item.readings[0]).id)}
-            className="flex h-14 w-[140px] flex-none cursor-pointer items-center justify-center gap-2 rounded-sm border-2 border-charcoal bg-surface text-lg font-bold text-charcoal"
-          >
-            <Icon name="ruler" strokeWidth={2.4} />
-            Meten
-            {measuredCount > 0 && (
-              <small className="text-base font-semibold text-muted">
-                {measuredCount}/{item.readings.length}
-              </small>
-            )}
-          </button>
+          />
         ) : (
-          <>
-            <ChoiceButton
-              icon="check"
-              label="Goed"
-              look={item.status === 'ok' ? 'good' : 'neutral'}
-              pressed={item.status === 'ok'}
-              onClick={onGood}
-            />
-            <ChoiceButton
-              icon={faultIcon}
-              label={faultLabel}
-              look={faultLook}
-              pressed={item.status === 'fault' || item.status === 'advice' || item.status === 'repaired'}
-              expanded={expanded}
-              onClick={onFault}
-            />
-          </>
+          <ChoiceButton
+            icon="check"
+            label="Goed"
+            look={item.status === 'ok' ? 'good' : 'neutral'}
+            pressed={item.status === 'ok'}
+            onClick={onGood}
+          />
         )}
+        <ChoiceButton
+          icon={faultIcon}
+          label={faultLabel}
+          look={faultLook}
+          pressed={item.status === 'fault' || item.status === 'advice' || item.status === 'repaired'}
+          expanded={expanded}
+          onClick={onFault}
+        />
       </div>
 
-      {expanded && !needsMeasure && (
+      {expanded && (
         <FaultPanel item={item} note={note} hintAdvice={adviceHint} onDecided={onDecided} onClose={onClosePanel} />
       )}
     </div>
