@@ -79,3 +79,10 @@ export function useAuth(): AuthContextValue {
   if (!value) throw new Error('useAuth must be used inside AuthProvider')
   return value
 }
+
+/** The signed-in employee, for screens behind RequireAuth and RequireRole. */
+export function useEmployee(): Employee {
+  const { state } = useAuth()
+  if (state.status !== 'signedIn' || !state.employee) throw new Error('useEmployee needs a signed-in employee')
+  return state.employee
+}

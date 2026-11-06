@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 const tones = {
   fault: 'border-2 border-fault bg-fault-tint text-fault-ink',
+  advice: 'border-2 border-advice bg-advice-tint text-advice-ink',
   info: 'border border-divider bg-surface text-ink',
 }
 
@@ -10,7 +11,7 @@ type NoticeProps = {
   children: ReactNode
 }
 
-// Faults are announced right away, info is polite.
+// Faults are announced right away, the rest is polite.
 export function Notice({ tone = 'info', children }: NoticeProps) {
   return (
     <div

@@ -23,6 +23,10 @@
   --color-fault-tint: #fdecee;
   --color-fault-ink: #a50d19;
 
+  /* Dutch licence plate: yellow plate, blue EU band. */
+  --color-plate: #f7c600;
+  --color-plate-eu: #1f3f99;
+
   --font-heading: 'Raleway', Arial, sans-serif;
   --font-sans: 'Open Sans', Arial, sans-serif;
 

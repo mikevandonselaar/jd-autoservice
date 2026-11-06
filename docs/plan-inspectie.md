@@ -23,29 +23,42 @@ Migratie `20261106130000_inspections.sql`, tests in `inspections_rls.test.sql`. 
 - RPC's voor de eigenaar: `admin_save_part_type`, `admin_delete_part_type`, `admin_save_checklist`, `admin_delete_checklist`
 - Startgegevens: 14 types onderdelen en de checklist "Grote beurt" (41 punten, 9 metingen)
 
-### 2. Gedeelde componenten
+### 2. Gedeelde componenten ✅
 
-- [ ] `AppShell`: ruimte voor eigen inhoud links in de header (kenteken en km-stand in M2, terugknop met titel in M5)
-- [ ] `PlateBadge`, `OptionButton` (keuzeknop met `aria-pressed`), `ProgressBar`
-- [ ] `Accordion` voor de blokken, `StatusTile` voor een punt, `MeasureCard` voor een meting
-- [ ] `BottomSheet` (dialog, max. 480px breed), `NumericKeypad`, `UndoToast`
+In `src/components`.
 
-### 3. Monteur: M1 t/m M6
+- [x] `AppShell`: ruimte voor eigen inhoud links in de header (kenteken en km-stand in M2, terugknop met titel in M5), een vaste band onder de header voor de voortgang, en een vaste footer
+- [x] `PlateBadge`, `OptionButton` (keuzeknop met `aria-pressed`), `ProgressBar`
+- [x] `Accordion` voor de blokken, `StatusTile` voor een punt, `MeasureCard` voor een meting
+- [x] `BottomSheet` (dialog, max. 480px breed), `NumericKeypad`, `UndoToast`
 
-- [ ] **M1 Start** (`/inspectie/nieuw`): kenteken, km-stand, keuze van de checklist. Na het invullen van het kenteken: de vorige km-stand en de open adviezen van het vorige bezoek. Een tegel "Nieuwe inspectie" op het startscherm.
-- [ ] **M2 Checklist** (`/inspectie/:id`): blokken als accordeon. Een tik wisselt een punt: open → goed → niet goed (bij niet goed opent M4). "Rest goed" met Herstel-toast, filter "Alleen open", voortgang voor punten en metingen, en "Afronden" pas als niets meer open staat. Een concept kun je weggooien.
-- [ ] **M3 Meten**: bottom sheet met het eigen toetsenbord, de posities als tabs (LV/RV/LA/RA), de vorige waarde en de grenzen. Daarna door naar de volgende positie. Komt een waarde voorbij een grens, dan stelt M3 advies of fout voor.
-- [ ] **M4 Fout**: de redenen van het type onderdeel als keuzes, plus "Anders" met vrije tekst. Wat je ermee doet: nu gerepareerd of advies. Termijn: nu, volgende beurt of paar maanden. Een herhaling van een eerder advies krijgt een melding.
-- [ ] **M5 Controle**: de tellers, de gevonden punten (tik om aan te passen, dan opent M4), de metingen en de notitie voor de balie. Daarna afronden.
-- [ ] **M6 Opgeslagen**: samenvatting voor de balie, de punten die bij het volgende bezoek verwacht worden, en "Volgende auto".
+### 3. Monteur: M1 t/m M6 ✅
 
-### 4. Eigenaar: beheer
+Schermen in `src/screens/inspection`, de data en regels (grenzen, vorig bezoek) in `src/inspection`. Gecontroleerd in de browser op 390px breed, tegen het testproject, als eigenaar.
 
-Hier is geen ontwerp voor. Ik bouw het in dezelfde stijl: één kolom, dezelfde componenten.
+- [x] **M1 Start** (`/inspectie/nieuw`): kenteken, km-stand, keuze van de checklist. Na het invullen van het kenteken: de vorige km-stand en de open adviezen van het vorige bezoek. Een tegel "Nieuwe inspectie" op het startscherm.
+- [x] **M2 Checklist** (`/inspectie/:id`): blokken als accordeon. Een tik wisselt een punt: open → goed → niet goed (bij niet goed opent M4). "Rest goed" met Herstel-toast, filter "Alleen open", voortgang voor punten en metingen, en "Afronden" pas als niets meer open staat. Een concept kun je weggooien.
+- [x] **M3 Meten**: bottom sheet met het eigen toetsenbord, de posities als tabs (LV/RV/LA/RA), de vorige waarde en de grenzen. Daarna door naar de volgende positie. Komt een waarde voorbij een grens, dan stelt M3 advies of fout voor.
+- [x] **M4 Fout**: de redenen van het type onderdeel als keuzes, plus "Anders" met vrije tekst. Wat je ermee doet: nu gerepareerd of advies. Termijn: nu, volgende beurt of paar maanden. Een herhaling van een eerder advies krijgt een melding.
+- [x] **M5 Controle** (`/inspectie/:id/controle`): de tellers, de gevonden punten (tik om aan te passen, dan opent M4), de metingen en de notitie voor de balie. Daarna afronden.
+- [x] **M6 Opgeslagen** (`/inspectie/:id/klaar`): samenvatting voor de balie, de punten die bij het volgende bezoek verwacht worden, en "Volgende auto".
 
-- [ ] Lijst met checklists. Nieuw, kopiëren, verwijderen.
-- [ ] Editor voor één checklist: blokken en punten toevoegen, hernoemen en verplaatsen. Per punt het type onderdeel en eventuele metingen met eenheid, richting en grenzen.
-- [ ] Types onderdelen: naam en redenen.
+Keuzes onderweg:
+
+- Termijn "Nu" in M4 is een fout (klant bellen). "Nu gerepareerd" wordt gerepareerd, de twee andere termijnen worden advies.
+- Een tik op een punt met een resultaat (gerepareerd, advies, fout) zet het terug op open. Aanpassen met behoud van de reden kan via Controle.
+- Een meting sluiten of van positie wisselen bewaart de ingetikte waarde. Na de laatste positie opent M4 alleen als het punt nog open of goed staat.
+- Het startscherm toont "Lopende inspecties" van jezelf, om een concept op een ander apparaat te hervatten. In M2 sluit "Sluiten, later verder" af zonder weg te gooien.
+- De tellers in M5 heten "Gerepareerd", niet "Hersteld", om verwarring met de Herstel-knop te voorkomen.
+- Alleen de rollen `admin` en `employee` komen op de routes onder `/inspectie`. Dat verbergt alleen schermen; RLS en de RPC's beslissen.
+
+### 4. Eigenaar: beheer ✅
+
+Hier is geen ontwerp voor. Gebouwd in dezelfde stijl: één kolom, dezelfde componenten. Schermen in `src/screens/admin`, alleen voor de rol `admin`.
+
+- [x] Lijst met checklists (`/beheer/checklists`). Nieuw, kopiëren, verwijderen.
+- [x] Editor voor één checklist (`/beheer/checklists/:id`, `nieuw` voor een nieuwe): blokken en punten toevoegen, hernoemen en verplaatsen. Per punt het type onderdeel en eventuele metingen met eenheid, richting en grenzen. Alles gaat in één keer naar `admin_save_checklist`.
+- [x] Types onderdelen (`/beheer/onderdelen`): naam en redenen.
 
 ### 5. Later
 
