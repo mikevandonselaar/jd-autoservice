@@ -1,0 +1,9 @@
+<h2>Inloggen bij JD Autoservice</h2>
+
+<p>Tik op de knop om in te loggen:</p>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Inloggen</a></p>
+
+<p>Werkt de knop niet, bijvoorbeeld omdat je de app op je beginscherm hebt staan? Vul dan deze code in de app in:</p>
+<p style="font-size: 28px; font-weight: bold; letter-spacing: 4px">{{ .Token }}</p>
+
+<p>De link en de code werken één keer en een uur lang. Heb je dit niet aangevraagd? Dan kun je deze mail negeren.</p>
