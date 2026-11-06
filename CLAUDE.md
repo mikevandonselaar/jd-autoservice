@@ -30,7 +30,9 @@ Only the phone row "Telefoon · inspectie (mobiele variant)", artboards M1 to M6
 
 ## Data and roles
 
-- `public.employees (user_id, name, role, contract_hours_per_week, end_date)`. Roles: `employee` sees only their own row, `admin` (the owner) sees and corrects everything, `workshop` (the shared tablet) uses the inspection checklist and must never see hours, leave or balances of any employee.
+- `public.employees (user_id, name, role, contract_hours_per_week, end_date)`. Roles: `employee` sees only their own row, `admin` (the owner) sees and corrects everything, `workshop` (the shared tablet) must never see hours, leave or balances of any employee.
+- Inspections are done by `employee` and `admin` on their own account; the mechanic is the logged-in user. `workshop` has no access to checklists or inspections.
+- The owner manages several checklists (`checklists`, `checklist_blocks`, `checklist_points`, `checklist_measurements`). Starting an inspection copies the chosen checklist into `inspection_items` and `inspection_readings`, so later edits never change past inspections.
 - The role comes from the employees table only, never from the JWT or user metadata. `private.current_app_role()` reads it, and returns null after `end_date`.
 - RLS only filters rows, not columns. Anything the workshop account needs about other employees (for example a name picker) must come from an RPC that returns only those fields, never from a select on `employees`.
 
