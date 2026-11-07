@@ -2,7 +2,7 @@
 -- and `supabase test db` can run it. Everything happens in one rolled-back transaction.
 begin;
 
-select plan(84);
+select plan(89);
 
 -- Fixtures. Fixed ids start with c0000000, so they cannot clash with the dev seed.
 --   ...0a admin   ...01 employee   ...02 employee   ...03 workshop   ...04 employee, ended yesterday
@@ -345,6 +345,23 @@ select throws_ok(
   'an inspection with open points cannot be completed'
 );
 
+select lives_ok(
+  $$ select public.set_inspection_note(pg_temp.saved('insp'), '  Klant belt terug.  ') $$,
+  'employee saves the note of their draft while typing'
+);
+
+select is(
+  (select note from public.inspections where id = pg_temp.saved('insp')),
+  'Klant belt terug.',
+  'the note is stored trimmed'
+);
+
+select throws_ok(
+  $$ select public.set_inspection_note(pg_temp.saved('insp'), repeat('x', 1001)) $$,
+  '22023', null,
+  'a note over 1000 characters is rejected'
+);
+
 select throws_ok(
   $$ select public.admin_save_checklist(null, 'Testlijst', '[{"name":"A","points":[{"label":"B"}]}]') $$,
   '42501', 'not allowed',
@@ -373,6 +390,12 @@ select throws_ok(
   $$ select public.set_item_results(array[pg_temp.saved('item1')], 'fault', null, null) $$,
   'P0002', null,
   'a colleague cannot change the points'
+);
+
+select throws_ok(
+  $$ select public.set_inspection_note(pg_temp.saved('insp'), 'Van een collega') $$,
+  'P0002', null,
+  'a colleague cannot change the note'
 );
 
 select throws_ok(
@@ -411,6 +434,12 @@ select throws_ok(
   $$ select public.set_item_results(array[pg_temp.saved('item1')], 'fault', null, null) $$,
   'P0002', null,
   'a completed inspection cannot be changed'
+);
+
+select throws_ok(
+  $$ select public.set_inspection_note(pg_temp.saved('insp'), 'Later') $$,
+  'P0002', null,
+  'the note of a completed inspection cannot be changed'
 );
 
 select set_config('test.insp2', public.start_inspection(pg_temp.saved('checklist'), 'AB-12-CD', 5000)::text, true);

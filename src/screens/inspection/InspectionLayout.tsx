@@ -8,6 +8,7 @@ import {
   completeInspection,
   discardInspection,
   fetchInspection,
+  saveInspectionNote,
   saveItemResults,
   saveReading,
   type InspectionBundle,
@@ -121,6 +122,14 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
     [save, update],
   )
 
+  const saveNote = useCallback<InspectionContextValue['saveNote']>(
+    async (note) => {
+      update((data) => data && { ...data, inspection: { ...data.inspection, note: note.trim() || null } })
+      await save(() => saveInspectionNote(inspectionId, note))
+    },
+    [inspectionId, save, update],
+  )
+
   const complete = useCallback(
     async (note: string) => {
       const saved = await save(() => completeInspection(inspectionId, note))
@@ -226,6 +235,7 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
       saveFailed,
       setResults,
       setReadingValue,
+      saveNote,
       complete,
       discard,
       pendingPhotos,
@@ -241,6 +251,7 @@ function InspectionProvider({ bundle, update, reload }: ProviderProps) {
       saveFailed,
       setResults,
       setReadingValue,
+      saveNote,
       complete,
       discard,
       pendingPhotos,

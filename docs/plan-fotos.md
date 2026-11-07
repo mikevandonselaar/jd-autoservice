@@ -103,7 +103,8 @@ In `supabase/tests/inspection_photos_rls.test.sql`, met dezelfde opzet en rollen
 
 ## Open punten
 
-- **Camera of galerij.** Met `capture="environment"` opent direct de camera. Dat is sneller, maar een foto die je al gemaakt hebt kun je dan niet kiezen. Zo gebouwd; de eigenaar kan het nog anders willen.
 - **Maximaal 3 per punt.** Zo gebouwd. Genoeg?
-- **Bewaartermijn.** De 1 GB is na een paar jaar vol. Voorstel voor later: in het beheer een knop "Oude foto's opruimen" voor de eigenaar, die foto's van inspecties ouder dan bijvoorbeeld 12 maanden weghaalt via de Storage API. De eigenaar beslist de termijn.
-- **Losse bestanden.** Als een stap halverwege faalt, kan er een bestand zonder rij blijven staan. Dat zijn er weinig. De opruimknop kan die ook meenemen.
+- **Bewaartermijn.** De 1 GB is na een paar jaar vol. Voorstel: in het beheer een knop "Oude foto's opruimen" voor de eigenaar, die foto's van inspecties ouder dan bijvoorbeeld 12 maanden weghaalt via de Storage API. De eigenaar beslist de termijn. Besloten op 7 november 2026: nog niet bouwen, pas als de opslag voller raakt.
+- **Losse bestanden.** Als een stap halverwege faalt, kan er een bestand zonder rij blijven staan. Dat zijn er weinig. De opruimknop kan die ook meenemen, als die er komt.
+
+Besloten op 7 november 2026: **camera direct.** Met `capture="environment"` opent de knop "Foto" meteen de camera. Een foto die al op de telefoon staat kun je niet kiezen; dat is zo bedoeld, omdat het in de werkplaats één tik scheelt.

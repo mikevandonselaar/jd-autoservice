@@ -1,6 +1,6 @@
 # Plan: inspectiemodule
 
-Bouwplan voor de inspectie op de telefoon, naar het ontwerp M1 t/m M6 (zie [CLAUDE.md](../CLAUDE.md)) en het papieren formulier "grote beurt checklist". Bijgewerkt: 6 november 2026.
+Bouwplan voor de inspectie op de telefoon, naar het ontwerp M1 t/m M6 (zie [CLAUDE.md](../CLAUDE.md)) en het papieren formulier "grote beurt checklist". Bijgewerkt: 7 november 2026.
 
 ## Uitgangspunten
 
@@ -24,6 +24,7 @@ Migratie `20261106130000_inspections.sql`, tests in `inspections_rls.test.sql`. 
 - Startgegevens: 14 types onderdelen en de checklist "Grote beurt" (41 punten, 9 metingen)
 - Migratie `20261106150000_or_more_readings.sql`: `or_more_value` bij een meting en `or_more` bij een waarde, `set_reading(id, waarde, of_meer)`, en de banden van de startchecklists op 5 mm.
 - Migratie `20261106170000_coolant_conditions_brakes.sql` (feedback werkplaats): waarden onder nul, `min_age_years` en `min_odometer_km` bij een punt, `build_year` bij een inspectie, `start_inspection(checklist, kenteken, km, bouwjaar)`. Remmen voor/achter gesplitst in remblokken (met voering) en remschijven, met de nieuwe types Remblokken, Remschijven en Koelsysteem. Koelvloeistof (vriespunt) in Grote beurt voor elke auto, in Kleine beurt vanaf 10 jaar.
+- Migratie `20261107120000_inspection_note.sql`: `set_inspection_note(inspectie, notitie)`, zodat de notitie voor de balie tijdens het typen wordt opgeslagen. `complete_inspection` slaat de notitie bij afronden nog steeds op.
 
 ### 2. Gedeelde componenten ✅
 
@@ -58,6 +59,8 @@ Keuzes onderweg:
 - **Extra punten voor oudere auto's.** Een punt kan "alleen vanaf" een leeftijd in jaren en/of een km-stand hebben (in het beheer). Bij de start vult de monteur het bouwjaar in (overgenomen van het vorige bezoek). Het punt komt mee als de auto aan één van de twee voldoet, en staat in de checklist als "Extra · vanaf 10 jaar". Zonder bouwjaar komen alle extra punten mee.
 - **Waarden onder nul**, voor het vriespunt van koelvloeistof. Liggen de grenzen onder nul, dan telt een getypte waarde ook als onder nul; het toetsenbord heeft geen minteken.
 - De tellers in M5 heten "Gerepareerd", niet "Hersteld", om verwarring met de Herstel-knop te voorkomen.
+- **Bouwjaar van de RDW.** Na het invullen van het kenteken haalt M1 het bouwjaar op uit de open data van de RDW (`src/inspection/rdw.ts`, gratis, zonder sleutel; alleen het kenteken gaat de app uit). Het jaar van de eerste toelating, ook in het buitenland, telt als bouwjaar. Merk en type staan naast het veld, zodat een tikfout in het kenteken opvalt. Een zelf getypt jaar gaat voor, daarna de RDW, daarna het vorige bezoek. Kent de RDW het kenteken niet (buitenlands) of is de RDW niet bereikbaar, dan typ je het jaar zelf.
+- **De notitie voor de balie** wordt opgeslagen kort nadat je stopt met typen, bij het verlaten van het veld en bij het verlaten van de controle. Afronden wacht tot een lopende opslag klaar is.
 - Alleen de rollen `admin` en `employee` komen op de routes onder `/inspectie`. Dat verbergt alleen schermen; RLS en de RPC's beslissen.
 
 ### 4. Eigenaar: beheer ✅
@@ -72,18 +75,20 @@ Hier is geen ontwerp voor. Gebouwd in dezelfde stijl: één kolom, dezelfde comp
 
 - [x] Foto bij een fout (Supabase Storage, met eigen RLS en verkleinde afbeeldingen). Zie [plan-fotos.md](plan-fotos.md).
 - [x] Overzicht voor de balie (`/inspecties`): afgeronde inspecties per dag, met de fouten en adviezen, de notitie, en een filter op "alleen met fout of advies". De laatste 7 dagen, daarna per 7 dagen meer. Te bereiken via "Afgeronde inspecties" op het startscherm, voor `employee` en `admin`.
-- [ ] Verwachte punten laten meetellen in de planning (de planningsschermen zijn nog niet ontworpen)
+- [ ] Verwachte punten laten meetellen in de planning. Wacht op de planning zelf: daar is nog geen ontwerp, tabel of scherm voor.
 
 ## Open punten
 
 - De grenzen voor koelvloeistof (advies boven -25 °C, fout boven -15 °C) zijn een eerste voorstel. De eigenaar loopt ze na.
 - Remschijven hebben geen meting: de minimale dikte verschilt per auto. Het is Goed of Fout, met de reden "Onder minimale dikte".
-- Het bouwjaar wordt nu ingetypt. Het kan ook automatisch uit de open data van de RDW komen (gratis, zonder sleutel), maar dat is een extra externe dienst.
-
-- Eindcontrole bestaat uit handelingen (servicereset, wielmoeren, Forte brandstofadditief). Moet er een apart type **Handeling** komen, met redenen als "Niet gedaan" en "Klant wil niet"?
 - De checklists "Kleine beurt" (23 punten, 7 metingen) en "APK" (31 punten, 7 metingen) staan als startgegevens in `20261106140000_more_checklists.sql`. De punten zijn een eerste opzet uit algemene kennis, niet de officiële RDW-lijst. De eigenaar loopt ze na in het beheer.
-- De notitie voor de balie wordt pas opgeslagen bij afronden, niet bij elke tik.
 - Het label "voorstel" wordt niet bewaard. Willen we in de controle en het overzicht zien welke uitkomsten uit een meting kwamen, dan is daar een kolom voor nodig.
 - Een punt dat al een uitkomst heeft en opnieuw gemeten wordt, krijgt geen nieuw voorstel (zie boven). Is dat in de praktijk te stil, dan kan er een melding bij.
 
 Besloten: de grenzen voor accu (advies onder 12,4 V, fout onder 12,0 V), remvloeistof (advies boven 1 %, fout boven 2 %), remvoering (advies onder 3,0 mm, fout onder 1,5 mm) en profiel (advies onder 4,0 mm, fout onder 1,6 mm) zijn voorlopig goed.
+
+Besloten op 7 november 2026:
+
+- Geen apart type **Handeling** voor de eindcontrole (servicereset, wielmoeren, Forte brandstofadditief). Die punten blijven zoals ze zijn.
+- Het bouwjaar komt van de **RDW**, ondanks dat het een extra externe dienst is. Gebouwd, zie fase 3.
+- De notitie voor de balie wordt tijdens het typen opgeslagen. Gebouwd, zie fase 1 en 3.

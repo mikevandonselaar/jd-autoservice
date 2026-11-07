@@ -7,6 +7,7 @@ Small in-house PWA for an independent car garage in the Netherlands: vehicle ins
 Vite, React 19, TypeScript 6 (pinned: typescript-eslint does not support 6.1+ yet), Tailwind CSS 4, react-router (declarative mode), vite-plugin-pwa, Supabase (Frankfurt, free tier).
 
 - No API server. Reads use supabase-js under RLS. Writes go through Postgres RPC functions.
+- The one outside service besides Supabase: the build year at the start of an inspection comes from the RDW open data (`src/inspection/rdw.ts`, no key). Only the licence plate is sent; without an answer the year is typed in.
 - Static hosting on Plesk: the build output is uploaded and every route falls back to `index.html` (`public/.htaccess`, `public/web.config`).
 
 ## Commands

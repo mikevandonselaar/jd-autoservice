@@ -10,6 +10,7 @@ import { OptionButton } from '../../components/OptionButton'
 import { PlateField } from '../../components/PlateBadge'
 import { SectionLabel } from '../../components/SectionLabel'
 import { fetchChecklists, fetchPreviousVisit, plateKeyOf, startInspection } from '../../inspection/api'
+import { fetchRdwVehicle, type RdwVehicle } from '../../inspection/rdw'
 import { termLabel } from '../../inspection/rules'
 import type { PreviousVisit } from '../../inspection/types'
 import { formatKm } from '../../lib/format'
@@ -27,10 +28,11 @@ export function StartPage() {
   const checklists = useLoad(fetchChecklists)
   const [plateText, setPlateText] = useState('')
   const [kmText, setKmText] = useState('')
-  // Null until typed in: then the build year of the previous visit counts.
+  // Null until typed in: then the build year of the RDW counts, or else of the previous visit.
   const [yearText, setYearText] = useState<string | null>(null)
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [found, setFound] = useState<{ key: string; visit: PreviousVisit | null } | null>(null)
+  const [registered, setRegistered] = useState<{ key: string; vehicle: RdwVehicle | null } | null>(null)
   const [starting, setStarting] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -39,10 +41,11 @@ export function StartPage() {
   const plateValid = PLATE.test(plate) && plateKey.length >= 3 && plateKey.length <= 8
   const km = kmText === '' ? null : Number(kmText)
 
-  // Look up the earlier visit once the plate looks complete, not at every key press.
+  // Look up the earlier visit and the RDW once the plate looks complete, not at every key press.
   useEffect(() => {
     if (!plateValid) return
     let active = true
+    const rdw = new AbortController()
     const timer = setTimeout(() => {
       fetchPreviousVisit(plateKey, null).then(
         (visit) => {
@@ -52,16 +55,28 @@ export function StartPage() {
           if (active) setFound({ key: plateKey, visit: null })
         },
       )
+      // Without an answer the build year is simply typed in.
+      fetchRdwVehicle(plateKey, rdw.signal).then(
+        (vehicle) => {
+          if (active) setRegistered({ key: plateKey, vehicle })
+        },
+        () => {
+          if (active) setRegistered({ key: plateKey, vehicle: null })
+        },
+      )
     }, 400)
     return () => {
       active = false
+      rdw.abort()
       clearTimeout(timer)
     }
   }, [plateKey, plateValid])
   const previous = plateValid && found?.key === plateKey ? found.visit : null
   const earlierAdvice = (previous?.items ?? []).filter((item) => item.status === 'advice')
+  const vehicle = plateValid && registered?.key === plateKey ? registered.vehicle : null
+  const rdwYear = vehicle && vehicle.buildYear <= MAX_YEAR ? String(vehicle.buildYear) : null
 
-  const shownYear = yearText ?? (previous?.build_year != null ? String(previous.build_year) : '')
+  const shownYear = yearText ?? rdwYear ?? (previous?.build_year != null ? String(previous.build_year) : '')
   const year = shownYear.length === 4 ? Number(shownYear) : null
   const yearValid = year !== null && year >= MIN_YEAR && year <= MAX_YEAR
 
@@ -141,7 +156,14 @@ export function StartPage() {
             className="h-14 w-full min-w-0 rounded-sm border-[3px] border-charcoal bg-surface px-3 text-2xl font-bold text-ink focus:outline-none"
           />
         </div>
-        <span className="pb-1 text-muted">Voor de extra punten bij oudere auto's.</span>
+        {vehicle ? (
+          <span className="pb-1 text-muted">
+            <b className="block text-ink">{vehicle.name}</b>
+            {yearText === null && rdwYear ? 'Bouwjaar van de RDW.' : "Voor de extra punten bij oudere auto's."}
+          </span>
+        ) : (
+          <span className="pb-1 text-muted">Voor de extra punten bij oudere auto's.</span>
+        )}
       </div>
 
       {year !== null && !yearValid && (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { AppShell, BackHeader } from '../../components/AppShell'
 import { Button } from '../../components/Button'
@@ -23,9 +23,40 @@ const counters: { status: ItemStatus; label: string; icon: IconName; tone: strin
 /** M5: everything that was found, before the inspection is completed. */
 export function ReviewPage() {
   const navigate = useNavigate()
-  const { inspection, items, previousByPoint, saveFailed, complete } = useInspection()
+  const { inspection, items, previousByPoint, saveFailed, saveNote, complete } = useInspection()
   const [note, setNote] = useState(inspection.note ?? '')
   const [saving, setSaving] = useState(false)
+
+  // The note is saved shortly after typing stops, like every other tap. Saves run one after
+  // the other, so an older text never overwrites a newer one.
+  const noteTimer = useRef<number | undefined>(undefined)
+  const unsavedNote = useRef<string | null>(null)
+  const noteSaves = useRef<Promise<void>>(Promise.resolve())
+
+  const flushNote = useCallback(() => {
+    clearTimeout(noteTimer.current)
+    const text = unsavedNote.current
+    if (text !== null) {
+      unsavedNote.current = null
+      noteSaves.current = noteSaves.current.then(() => saveNote(text))
+    }
+    return noteSaves.current
+  }, [saveNote])
+
+  // Leaving the page saves what was typed.
+  useEffect(
+    () => () => {
+      void flushNote()
+    },
+    [flushNote],
+  )
+
+  function changeNote(text: string) {
+    setNote(text)
+    unsavedNote.current = text
+    clearTimeout(noteTimer.current)
+    noteTimer.current = window.setTimeout(() => void flushNote(), 800)
+  }
   const found = findings(items)
   // The first photo of each finding, as a thumbnail.
   const urlOf = usePhotoUrls(found.flatMap((item) => item.photos.slice(0, 1).map((photo) => photo.path)))
@@ -37,6 +68,10 @@ export function ReviewPage() {
 
   async function finish() {
     setSaving(true)
+    // Completing saves the note itself; a save still under way must land before it.
+    clearTimeout(noteTimer.current)
+    unsavedNote.current = null
+    await noteSaves.current
     if (await complete(note)) navigate(`/inspectie/${inspection.id}/klaar`, { replace: true })
     else setSaving(false)
   }
@@ -62,7 +97,7 @@ export function ReviewPage() {
           Er staan nog {counts.open} {counts.open === 1 ? 'punt' : 'punten'} open. Vul die eerst in.
         </Notice>
       )}
-      {saveFailed && <Notice tone="fault">Afronden lukt nu niet. Controleer je verbinding en probeer het opnieuw.</Notice>}
+      {saveFailed && <Notice tone="fault">Opslaan lukt nu niet. Controleer je verbinding en probeer het opnieuw.</Notice>}
 
       <div className="grid grid-cols-2 gap-2">
         {counters.map(({ status, label, icon, tone }) => (
@@ -159,7 +194,8 @@ export function ReviewPage() {
         rows={2}
         maxLength={1000}
         value={note}
-        onChange={(event) => setNote(event.target.value)}
+        onChange={(event) => changeNote(event.target.value)}
+        onBlur={() => void flushNote()}
       />
     </AppShell>
   )

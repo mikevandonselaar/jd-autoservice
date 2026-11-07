@@ -24,6 +24,8 @@ export type InspectionContextValue = {
   setResults: (ids: string[], status: ItemStatus, term: AdviceTerm | null, reason: string | null) => Promise<void>
   /** Saves one measured value; `orMore` says it is "this or more", like 5 mm tread or more. */
   setReadingValue: (readingId: string, value: number | null, orMore?: boolean) => Promise<void>
+  /** Saves the note for the front desk while typing. */
+  saveNote: (note: string) => Promise<void>
   /** Completes the draft. False when it failed. */
   complete: (note: string) => Promise<boolean>
   /** Throws the draft away, and then its photo files. False when it failed. */

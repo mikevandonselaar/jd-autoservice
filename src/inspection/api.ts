@@ -163,6 +163,10 @@ export async function saveReading(readingId: string, value: number | null, orMor
   unwrap(await supabase.rpc('set_reading', { p_reading_id: readingId, p_value: value, p_or_more: orMore }))
 }
 
+export async function saveInspectionNote(id: string, note: string): Promise<void> {
+  unwrap(await supabase.rpc('set_inspection_note', { p_inspection_id: id, p_note: note }))
+}
+
 export async function completeInspection(id: string, note: string): Promise<void> {
   unwrap(await supabase.rpc('complete_inspection', { p_inspection_id: id, p_note: note }))
 }
