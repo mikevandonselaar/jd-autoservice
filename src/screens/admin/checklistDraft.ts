@@ -142,7 +142,7 @@ export function validate(draft: Draft): string | null {
         }
         if (advice !== null && fault !== null) {
           const wrongWay = m.direction === 'lower_is_worse' ? fault > advice : fault < advice
-          if (wrongWay) return `${pointWhere}, meting ${m.label.trim()}: de foutgrens ligt voorbij de adviesgrens.`
+          if (wrongWay) return `${pointWhere}, meting ${m.label.trim()}: de foutgrens moet voorbij de adviesgrens liggen.`
         }
       }
     }
