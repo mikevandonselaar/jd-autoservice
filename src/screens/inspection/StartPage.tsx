@@ -10,13 +10,14 @@ import { OptionButton } from '../../components/OptionButton'
 import { PlateField } from '../../components/PlateBadge'
 import { SectionLabel } from '../../components/SectionLabel'
 import { fetchChecklists, fetchPreviousVisit, plateKeyOf, startInspection } from '../../inspection/api'
+import { dutchPlate } from '../../inspection/plate'
 import { fetchRdwVehicle, type RdwVehicle } from '../../inspection/rdw'
 import { termLabel } from '../../inspection/rules'
 import type { PreviousVisit } from '../../inspection/types'
 import { formatKm } from '../../lib/format'
 import { useLoad } from '../../lib/useLoad'
 
-// Same pattern as the database: letters and digits, with dashes between groups.
+// A foreign plate gets the pattern of the database: letters and digits, with dashes between groups.
 const PLATE = /^[A-Z0-9]+(-[A-Z0-9]+)*$/
 const MAX_KM = 2_000_000
 const MIN_YEAR = 1900
@@ -27,6 +28,8 @@ export function StartPage() {
   const navigate = useNavigate()
   const checklists = useLoad(fetchChecklists)
   const [plateText, setPlateText] = useState('')
+  // A foreign car: no Dutch series check and no RDW.
+  const [foreign, setForeign] = useState(false)
   const [kmText, setKmText] = useState('')
   // Null until typed in: then the build year of the RDW counts, or else of the previous visit.
   const [yearText, setYearText] = useState<string | null>(null)
@@ -36,9 +39,14 @@ export function StartPage() {
   const [starting, setStarting] = useState(false)
   const [failed, setFailed] = useState(false)
 
-  const plate = plateText
+  // A Dutch plate is saved with the dashes of its series, so the same car always reads the same.
+  const plate = foreign ? plateText : (dutchPlate(plateText) ?? plateText)
   const plateKey = plateKeyOf(plate)
-  const plateValid = PLATE.test(plate) && plateKey.length >= 3 && plateKey.length <= 8
+  const plateValid = foreign
+    ? PLATE.test(plate) && plateKey.length >= 3 && plateKey.length <= 8
+    : dutchPlate(plate) !== null
+  // Dutch plates have 6 characters: only then is a wrong one worth a word.
+  const notDutch = !foreign && !plateValid && plateKey.length >= 6
   const km = kmText === '' ? null : Number(kmText)
 
   // Look up the earlier visit and the RDW once the plate looks complete, not at every key press.
@@ -55,7 +63,8 @@ export function StartPage() {
           if (active) setFound({ key: plateKey, visit: null })
         },
       )
-      // Without an answer the build year is simply typed in.
+      // Without an answer the build year is simply typed in. The RDW only knows Dutch plates.
+      if (foreign) return
       fetchRdwVehicle(plateKey, rdw.signal).then(
         (vehicle) => {
           if (active) setRegistered({ key: plateKey, vehicle })
@@ -70,10 +79,10 @@ export function StartPage() {
       rdw.abort()
       clearTimeout(timer)
     }
-  }, [plateKey, plateValid])
+  }, [plateKey, plateValid, foreign])
   const previous = plateValid && found?.key === plateKey ? found.visit : null
   const earlierAdvice = (previous?.items ?? []).filter((item) => item.status === 'advice')
-  const vehicle = plateValid && registered?.key === plateKey ? registered.vehicle : null
+  const vehicle = plateValid && !foreign && registered?.key === plateKey ? registered.vehicle : null
   const rdwYear = vehicle && vehicle.buildYear <= MAX_YEAR ? String(vehicle.buildYear) : null
 
   const shownYear = yearText ?? rdwYear ?? (previous?.build_year != null ? String(previous.build_year) : '')
@@ -116,7 +125,11 @@ export function StartPage() {
           label="Kenteken"
           value={plate}
           maxLength={10}
-          onChange={(event) => setPlateText(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+          onChange={(event) => {
+            setPlateText(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))
+            // A typed build year belongs to the car of the old plate.
+            setYearText(null)
+          }}
         />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="km" className="text-base font-semibold">
@@ -136,6 +149,24 @@ export function StartPage() {
           {previous && <span className="text-muted">Vorige: {formatKm(previous.odometer_km)} km</span>}
         </div>
       </div>
+
+      <button
+        type="button"
+        aria-pressed={foreign}
+        onClick={() => setForeign(!foreign)}
+        className="inline-flex min-h-14 cursor-pointer items-center gap-2 self-start rounded-sm border-2 border-charcoal bg-surface px-3 font-bold text-charcoal"
+      >
+        <span
+          className={`flex size-5 items-center justify-center rounded-sm border-2 border-charcoal ${foreign ? 'bg-charcoal text-white' : ''}`}
+        >
+          {foreign && <Icon name="check" className="size-3" />}
+        </span>
+        Buitenlands kenteken
+      </button>
+
+      {notDutch && (
+        <Notice tone="fault">Dit is geen Nederlands kenteken. Een buitenlandse auto? Zet dan het vinkje aan.</Notice>
+      )}
 
       {previous && km !== null && km < previous.odometer_km && (
         <Notice tone="advice">Lager dan de vorige keer ({formatKm(previous.odometer_km)} km). Klopt dit?</Notice>

@@ -12,6 +12,7 @@ import { PlateBadge } from '../../components/PlateBadge'
 import { ProgressBar } from '../../components/ProgressBar'
 import { UndoToast } from '../../components/UndoToast'
 import { useInspection } from '../../inspection/InspectionContext'
+import { formatPlate } from '../../inspection/plate'
 import { countByStatus, countReadings, priorAdvice, readingState, suggestedStatus } from '../../inspection/rules'
 import type { InspectionItem, Reading } from '../../inspection/types'
 import { formatKm } from '../../lib/format'
@@ -281,7 +282,7 @@ export function ChecklistPage() {
           }
         >
           <p>
-            De inspectie van {inspection.plate} met alles wat je hebt ingevuld verdwijnt. Dit kun je niet terugdraaien.
+            De inspectie van {formatPlate(inspection.plate)} met alles wat je hebt ingevuld verdwijnt. Dit kun je niet terugdraaien.
           </p>
         </BottomSheet>
       )}

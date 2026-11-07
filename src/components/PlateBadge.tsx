@@ -1,17 +1,18 @@
 import type { InputHTMLAttributes } from 'react'
+import { formatPlate } from '../inspection/plate'
 
 const sizes = {
   sm: 'h-8 px-2 text-base',
   md: 'h-9 px-2.5 text-lg',
 }
 
-/** A licence plate as text, for headers and summaries. */
+/** A licence plate as text, for headers and summaries. Older Dutch plates get their dashes here. */
 export function PlateBadge({ plate, size = 'sm' }: { plate: string; size?: keyof typeof sizes }) {
   return (
     <span
       className={`inline-flex flex-none items-center rounded-sm border-2 border-ink bg-plate font-bold tracking-[0.05em] text-ink ${sizes[size]}`}
     >
-      {plate}
+      {formatPlate(plate)}
     </span>
   )
 }
